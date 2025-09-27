@@ -1,7 +1,7 @@
-import {Body, Controller, Get, Post, UseGuards} from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AuthenticationService } from './authentication.service';
-import {CreateUserDto} from "../user/dtos/create-user.dto";
-import {SocialsOauthGuard} from "./guard/socials-oauth.guard";
+import { CreateUserDto } from '../user/dtos/create-user.dto';
+import { SocialsOauthGuard } from './guard/socials-oauth.guard';
 
 @Controller('auth')
 export class AuthenticationController {
@@ -21,7 +21,8 @@ export class AuthenticationController {
 
   @Get('socials/google/redirect')
   @UseGuards(SocialsOauthGuard)
-  async socialRedirect(@Body() user: any) {  // todo: add type of user
-    return this.authenticationService.sign(user)
+  async socialRedirect(@Body() user: any) {
+    // todo: add type of user
+    return this.authenticationService.sign(user);
   }
 }

@@ -12,7 +12,7 @@ import jwtConfig from '../config/jwt.config';
     UserModule,
     PassportModule,
     JwtModule.registerAsync({
-      imports: [ConfigModule], // ensure ConfigModule is available
+      imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigType<typeof jwtConfig>) => ({
         secret: configService.secret,

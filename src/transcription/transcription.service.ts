@@ -1,12 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { CreateTranscriptionDto } from './dto/create-transcription.dto';
-import { UpdateTranscriptionDto } from './dto/update-transcription.dto';
-import {Transcription} from "./interfaces/transcription";
+import { Inject, Injectable } from '@nestjs/common';
+import { TranscriptionInterface } from './interfaces/transcription.interface';
 
 @Injectable()
-export class TranscriptionService implements Transcription {
-  constructor() {
-  }
-  transcribe(file: File): void {
-  }
+export class TranscriptionService {
+  constructor(
+    @Inject('TRANSCRIPTION_PROVIDER')
+    private readonly provider: TranscriptionInterface,
+  ) {}
+
+  /**
+   * Transcribe file to text.
+   * @param file
+   */
+  async transcribe(file: Express.Multer.File) {}
 }

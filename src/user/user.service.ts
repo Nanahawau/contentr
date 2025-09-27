@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { User } from './user.schema';
+import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import {InjectModel} from "@nestjs/mongoose";
+import { InjectModel } from '@nestjs/mongoose';
 
 @Injectable()
 export class UserService {
@@ -12,8 +12,8 @@ export class UserService {
    * Finds a user by email and provider.
    * @param user
    */
-  async findOne(user:{ email: string, provider: string }) {
-    const { email, provider = 'default'} = user
+  async findOne(user: { email: string; provider: string }) {
+    const { email, provider = 'default' } = user;
     const foundUser = await this.userModel.findOne({ email, provider });
 
     return foundUser || null;
@@ -23,7 +23,8 @@ export class UserService {
    * Creates user.
    * @param user
    */
-  async create(user: any) { //TODO: create user dto type
+  async create(user: any) {
+    //TODO: create user dto type
     const createdUser = await this.userModel.create(user);
 
     return this.userObject(createdUser);

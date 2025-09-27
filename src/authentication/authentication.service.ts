@@ -42,6 +42,6 @@ export class AuthenticationService {
     return {
       user,
       access_token: this.jwtService.sign(user),
-    }
+    };
   }
 }
