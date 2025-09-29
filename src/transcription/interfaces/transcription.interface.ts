@@ -1,3 +1,3 @@
 export interface TranscriptionInterface {
-  transcribe(file: File): Promise<string>;
+  transcribe(file: Express.Multer.File): Promise<string>;
 }

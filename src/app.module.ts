@@ -17,9 +17,20 @@ import { UploadModule } from './upload/upload.module';
 import { BullModule } from '@nestjs/bullmq';
 import { ConsumersModule } from './consumers/consumers.module';
 import { NotificationModule } from './notification/notification.module';
+import { ContentModule } from './content/content.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      load: [
+        databaseConfig,
+        defaultConfig,
+        googleOauthConfig,
+        jwtConfig,
+        awsConfig,
+      ],
+      isGlobal: true,
+    }),
     AuthenticationModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -32,16 +43,6 @@ import { NotificationModule } from './notification/notification.module';
       }),
     }),
     UserModule,
-    ConfigModule.forRoot({
-      load: [
-        databaseConfig,
-        defaultConfig,
-        googleOauthConfig,
-        jwtConfig,
-        awsConfig,
-      ],
-      isGlobal: true,
-    }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [databaseConfig.KEY],
@@ -53,6 +54,7 @@ import { NotificationModule } from './notification/notification.module';
     UploadModule,
     ConsumersModule,
     NotificationModule,
+    ContentModule,
   ],
   controllers: [AppController],
   providers: [

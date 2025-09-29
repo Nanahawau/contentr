@@ -13,7 +13,7 @@ export class AuthenticationController {
   }
   @Post('login')
   async login(@Body() user: CreateUserDto) {
-    return this.authenticationService.register(user);
+    return this.authenticationService.login(user);
   }
   @Get('socials/google')
   @UseGuards(SocialsOauthGuard)

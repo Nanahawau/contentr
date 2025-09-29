@@ -5,6 +5,7 @@ export default registerAs('defaultConfig', () => ({
   port: parseInt(process.env.PORT || '') || 3000,
   openAIKey: process.env.OPEN_AI_KEY || '',
   openAITranscriptionModel: process.env.OPEN_AI_TRANSCRIPTION_MODEL || '',
+  openAIContentGenerationModel: process.env.OPEN_AI_CONTENT_GENERATION_MODEL || '',
   uploadQueue: process.env.UPLOAD_QUEUE || 'uploadQueue',
   transcriptionQueue: process.env.TRANSCRIPTION_QUEUE || 'transcriptionQueue',
   llmQueue: process.env.LLM_QUEUE || 'llmQueue',

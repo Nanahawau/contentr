@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UserService } from '../user/user.service';
 import { JwtService } from '@nestjs/jwt';
 
@@ -16,9 +20,14 @@ export class AuthenticationService {
     const { email, password } = user;
     const foundUser = await this.userService.findOne({ email, provider });
 
-    const isValidUser =
-      foundUser &&
-      (await this.userService.isValidPassword(password, foundUser.password));
+    if (!foundUser) throw new BadRequestException('User does not exist');
+
+    const passwordMatch = await this.userService.isValidPassword(
+      foundUser.password,
+      password,
+    );
+
+    const isValidUser = foundUser && passwordMatch;
 
     return isValidUser ? this.userService.userObject(foundUser) : null;
   }

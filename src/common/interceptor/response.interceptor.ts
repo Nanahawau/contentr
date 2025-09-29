@@ -34,17 +34,34 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
     );
   }
 
-  errorHandler(exception: HttpException, context: ExecutionContext) {
+  errorHandler(exception: any, context: ExecutionContext) {
     const ctx = context.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();
+    let status: number;
+    let errors = undefined;
 
-    const status = exception.getStatus() || HttpStatus.INTERNAL_SERVER_ERROR;
+    if (exception instanceof HttpException) {
+      status = exception.getStatus();
+    } else if (exception.name === 'ValidationError') {
+      status = HttpStatus.BAD_REQUEST;
+      errors = exception.errors; // Mongoose validation errors
+    } else if (typeof exception.statusCode === 'number') {
+      status = exception.statusCode;
+    } else if (typeof exception.status === 'number') {
+      status = exception.status;
+    } else {
+      status = HttpStatus.INTERNAL_SERVER_ERROR;
+    }
+
+    const message = exception.response? exception.response.message : exception.message;
+
+    console.log({exception})
 
     response.status(status).json({
       status: false,
       statusCode: status,
-      message: exception.message,
+      message: message || 'Internal server error',
     });
   }
 

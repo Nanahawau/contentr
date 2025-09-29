@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
 import defaultConfig from 'src/config/default.config';
 import { NotificationService } from 'src/notification/notification.service';
+import { TranscriptionModule } from 'src/transcription/transcription.module';
 import { TranscriptionService } from 'src/transcription/transcription.service';
 import { UploadService } from 'src/upload/upload.service';
 
@@ -11,7 +12,7 @@ import { UploadService } from 'src/upload/upload.service';
   imports: [
     BullModule.registerQueueAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
+      inject: [defaultConfig.KEY],
       useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
         name: configService.uploadQueue,
         defaultJobOptions: {
@@ -27,7 +28,7 @@ import { UploadService } from 'src/upload/upload.service';
     }),
     BullModule.registerQueueAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
+      inject: [defaultConfig.KEY],
       useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
         name: configService.transcriptionQueue,
         defaultJobOptions: {
@@ -43,7 +44,7 @@ import { UploadService } from 'src/upload/upload.service';
     }),
     BullModule.registerQueueAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
+      inject: [defaultConfig.KEY],
       useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
         name: configService.llmQueue,
         defaultJobOptions: {
@@ -59,12 +60,13 @@ import { UploadService } from 'src/upload/upload.service';
     }),
     BullModule.registerFlowProducerAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
+      inject: [defaultConfig.KEY],
       useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
         name: configService.flowProducerName,
       }),
     }),
+    TranscriptionModule
   ],
-  exports: [],
+  exports: [BullModule],
 })
 export class ConsumersModule {}

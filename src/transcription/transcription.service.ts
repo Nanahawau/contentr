@@ -12,5 +12,7 @@ export class TranscriptionService {
    * Transcribe file to text.
    * @param file
    */
-  async transcribe(file: Express.Multer.File) {}
+  async transcribe(file: Express.Multer.File) {
+    return this.provider.transcribe(file);
+  }
 }

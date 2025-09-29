@@ -7,6 +7,9 @@ import {
   Transcription,
   TranscriptionSchema,
 } from './schemas/transcription.schema';
+import { ConfigModule } from '@nestjs/config';
+import defaultConfig from 'src/config/default.config';
+import { ConsumersModule } from 'src/consumers/consumers.module';
 
 @Module({
   controllers: [TranscriptionController],
@@ -14,6 +17,7 @@ import {
     MongooseModule.forFeature([
       { name: Transcription.name, schema: TranscriptionSchema },
     ]),
+    ConfigModule.forFeature(defaultConfig),
   ],
   providers: [
     TranscriptionService,
@@ -22,5 +26,6 @@ import {
       useClass: WhisperApiService,
     },
   ],
+  exports: [TranscriptionService, 'TRANSCRIPTION_PROVIDER']
 })
 export class TranscriptionModule {}

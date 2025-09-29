@@ -10,6 +10,12 @@ export type UploadJobResponse = {
   uploadId: string;
 };
 
-export type TranscriptionJobResponse {
-  text: string
+export type TranscriptionJobResponse = {
+  text: string,
+  userId: string,
+  uploadId: string,
+}
+
+export type LlmJobData = {
+  platforms: string[]
 }

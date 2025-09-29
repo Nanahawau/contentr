@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { CreateUploadDto } from './dto/create-upload.dto';
 import { UpdateUploadDto } from './dto/update-upload.dto';
 import { generateFileHash } from '../common/helpers/helper-functions';
@@ -11,10 +11,11 @@ import defaultConfig from 'src/config/default.config';
 export class UploadService {
   constructor(
     @InjectFlowProducer() private readonly flowProducer: FlowProducer,
+    @Inject(defaultConfig.KEY)
     private configService: ConfigType<typeof defaultConfig>,
   ) {}
-  async create(createUploadDto: CreateUploadDto): void {
-    const { file } = createUploadDto;
+  async create(createUploadDto: CreateUploadDto): Promise<void> {
+    const { file, platforms } = createUploadDto;
     const hashedFile = generateFileHash(file);
     const user_id = 1; // todo: get from auth context
 
@@ -35,7 +36,7 @@ export class UploadService {
             {
               name: 'generateContent',
               queueName: this.configService.llmQueue,
-              data: {},
+              data: { platforms },
             },
           ],
         },

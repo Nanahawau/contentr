@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import defaultConfig from '../../config/default.config';
 import { OpenAI } from 'openai';
+import * as fs from 'fs';
+import * as path from 'path';
 import { TranscriptionInterface } from '../../transcription/interfaces/transcription.interface';
 
 @Injectable()
 export class WhisperApiService implements TranscriptionInterface {
   private openAI: OpenAI;
-  constructor(private configService: ConfigType<typeof defaultConfig>) {
+  constructor(
+    @Inject(defaultConfig.KEY)
+    private configService: ConfigType<typeof defaultConfig>,
+  ) {
     this.openAI = new OpenAI({
       apiKey: configService.openAIKey,
     });
@@ -18,12 +23,22 @@ export class WhisperApiService implements TranscriptionInterface {
    * @param file
    * @return string
    */
-  async transcribe(file: File): Promise<string> {
-    const transcription = await this.openAI.audio.transcriptions.create({
-      file,
-      model: this.configService.openAITranscriptionModel,
-    });
+  async transcribe(file: Express.Multer.File): Promise<string> {
+    // Write buffer to a temporary file
+    const tempFilePath = path.join(
+      __dirname,
+      `../../../tmp/${Date.now()}-${file.originalname}`,
+    );
+    try {
+      const transcription = await this.openAI.audio.transcriptions.create({
+        file: fs.createReadStream(tempFilePath),
+        model: this.configService.openAITranscriptionModel,
+      });
 
-    return transcription.text;
+      return transcription.text;
+    } finally {
+      // Delete the temporary file
+      fs.unlinkSync(tempFilePath);
+    }
   }
 }

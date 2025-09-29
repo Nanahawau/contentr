@@ -9,11 +9,12 @@ import jwtConfig from '../config/jwt.config';
 
 @Module({
   imports: [
+    ConfigModule.forFeature(jwtConfig),
     UserModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
+      inject: [jwtConfig.KEY],
       useFactory: async (configService: ConfigType<typeof jwtConfig>) => ({
         secret: configService.secret,
         signOptions: { expiresIn: configService.jwtExpiry || '60s' },

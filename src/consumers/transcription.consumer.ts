@@ -42,7 +42,11 @@ export class TranscriptionConsumer extends WorkerHost {
         }
       }
 
-      return { text: transcription.text };
+      return {
+        text: transcription.text,
+        userId: transcription.user_id,
+        uploadId: transcription.upload_id,
+      };
     } catch (error) {
       throw new Error('An error occurred in transcription queue');
     }
