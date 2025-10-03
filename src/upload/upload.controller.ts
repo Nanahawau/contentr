@@ -28,7 +28,7 @@ export class UploadController {
       new ParseFilePipe({
         validators: [
           new FileTypeValidator({
-            fileType: '/\\.(mp3|mp4|mpeg|mpga|m4a|wav|webm)$/i',
+            fileType: /(audio\/mp3|audio\/mpeg|audio\/mpga|audio\/m4a|audio\/wav|audio\/webm|video\/mp4)$/i,
           }),
           new MaxFileSizeValidator({
             maxSize: 1000000,

@@ -18,6 +18,9 @@ import { BullModule } from '@nestjs/bullmq';
 import { ConsumersModule } from './consumers/consumers.module';
 import { NotificationModule } from './notification/notification.module';
 import { ContentModule } from './content/content.module';
+import { JwtAuthGuard } from './authentication/guard/jwt.guard';
+import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
+import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
 
 @Module({
   imports: [
@@ -62,6 +65,12 @@ import { ContentModule } from './content/content.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseInterceptor,
+    },
+    JwtAuthGuard,
+    SocialsOauthGuard,
+    {
+      provide: 'APP_GUARD',
+      useClass: GlobalAuthGuard,
     },
   ],
 })

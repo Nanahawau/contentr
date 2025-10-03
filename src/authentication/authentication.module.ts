@@ -4,12 +4,19 @@ import { AuthenticationController } from './authentication.controller';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
 import { UserModule } from '../user/user.module';
-import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
-import jwtConfig from '../config/jwt.config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
+import googleOauthConfig from 'src/config/google-oauth.config';
+import { JwtStrategy } from './strategy/jwt.strategy';
+import { GoogleOauthStrategy } from './strategy/social.strategy';
+import { SocialsOauthGuard } from './guard/socials-oauth.guard';
+import { GlobalAuthGuard } from './guard/globalauth.guard';
+import { JwtAuthGuard } from './guard/jwt.guard';
+import jwtConfig from 'src/config/jwt.config';
 
 @Module({
   imports: [
     ConfigModule.forFeature(jwtConfig),
+    ConfigModule.forFeature(googleOauthConfig),
     UserModule,
     PassportModule,
     JwtModule.registerAsync({
@@ -22,6 +29,13 @@ import jwtConfig from '../config/jwt.config';
     }),
   ],
   controllers: [AuthenticationController],
-  providers: [AuthenticationService],
+  providers: [
+    AuthenticationService,
+    JwtStrategy,
+    GoogleOauthStrategy,
+    SocialsOauthGuard,
+    GlobalAuthGuard,
+    JwtAuthGuard,
+  ],
 })
 export class AuthenticationModule {}
