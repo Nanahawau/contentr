@@ -1,7 +1,6 @@
-export type UploadJobData = {
+export type TranscriptionJobData = {
   userId: string;
-  file: Express.Multer.File;
-  hashedFile: string;
+  uploadId: string;
 };
 
 export type UploadJobResponse = {

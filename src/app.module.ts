@@ -21,6 +21,7 @@ import { ContentModule } from './content/content.module';
 import { JwtAuthGuard } from './authentication/guard/jwt.guard';
 import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
+import { AwsModule } from './integrations/aws/aws.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
     ConsumersModule,
     NotificationModule,
     ContentModule,
+    AwsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -20,5 +20,6 @@ import defaultConfig from 'src/config/default.config';
     MongooseModule.forFeature([{ name: Content.name, schema: ContentSchema }]),
     ConfigModule.forFeature(defaultConfig),
   ],
+  exports: [ContentService],
 })
 export class ContentModule {}

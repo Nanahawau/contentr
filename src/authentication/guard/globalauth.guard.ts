@@ -26,20 +26,26 @@ export class GlobalAuthGuard implements CanActivate {
     );
     if (isPublic) return true;
 
+    let message = null;
+
     // Try JWT first
     try {
       if (await this.jwtGuard.canActivate(context)) return true;
     } catch (error) {
-      this.logger.error(error.message, error.stack);
+      message = error?.message;
     }
-
     // Then try Google
     try {
-      if (await this.socialGuard.canActivate(context)) return true;
+      const result = await this.socialGuard.canActivate(context);
+      if (result) return true;
     } catch (error) {
+      console.log({ error });
+      message = error?.message;
       this.logger.error(error.message, error.stack);
     }
 
-    throw new UnauthorizedException('No valid authentication method found');
+    throw new UnauthorizedException(
+      message || 'No valid authentication method found',
+    );
   }
 }

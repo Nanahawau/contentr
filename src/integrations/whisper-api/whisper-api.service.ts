@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import defaultConfig from '../../config/default.config';
-import { OpenAI } from 'openai';
+import OpenAI from "openai";
 import * as fs from 'fs';
 import * as path from 'path';
 import { TranscriptionInterface } from '../../transcription/interfaces/transcription.interface';
+import { createFile } from 'src/common/helpers/helper-functions';
 
 @Injectable()
 export class WhisperApiService implements TranscriptionInterface {
@@ -29,6 +30,8 @@ export class WhisperApiService implements TranscriptionInterface {
       __dirname,
       `../../../tmp/${Date.now()}-${file.originalname}`,
     );
+    createFile(tempFilePath, file)
+
     try {
       const transcription = await this.openAI.audio.transcriptions.create({
         file: fs.createReadStream(tempFilePath),

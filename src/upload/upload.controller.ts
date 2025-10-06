@@ -13,8 +13,6 @@ import {
   MaxFileSizeValidator,
 } from '@nestjs/common';
 import { UploadService } from './upload.service';
-import { CreateUploadDto } from './dto/create-upload.dto';
-import { UpdateUploadDto } from './dto/update-upload.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('upload')
@@ -39,8 +37,8 @@ export class UploadController {
       }),
     )
     file: Express.Multer.File,
-    @Body() platforms: string[]
+    @Body('platforms') platforms: string
   ) {
-    return this.uploadService.create({ file, platforms });
+    return this.uploadService.create({ file, platforms: JSON.parse(platforms) });
   }
 }

@@ -5,7 +5,8 @@ import { ContentService } from 'src/content/content.service';
 import { Content } from 'src/content/schemas/content.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
-import { use } from 'passport';
+import { Logger } from '@nestjs/common';
+import { getQueueName } from 'src/common/helpers/helper-functions';
 
 export const platformPrompts = {
   twitter: (transcript: string) =>
@@ -23,6 +24,7 @@ export const platformPrompts = {
 
 @Processor('llmQueue')
 export class LLMConsumer extends WorkerHost {
+  private readonly logger = new Logger(LLMConsumer.name);
   constructor(
     private readonly contentService: ContentService,
     @InjectModel(Content.name) private contentModel: Model<Content>,
@@ -31,12 +33,14 @@ export class LLMConsumer extends WorkerHost {
   }
   async process(job: Job<LlmJobData, any, string>): Promise<any> {
     try {
+      this.logger.log({ message: 'llm consumer has started running', key: job?.parent?.queueKey});
       if (job.parent && job.parent.id) {
-        const parentQueue = new Queue(job.parent.queueKey);
+        const parentQueue = new Queue(getQueueName(job.parent.queueKey));
         const parentJob = await parentQueue.getJob(job.parent.id);
         const parentJobResult =
           (await parentJob?.returnvalue) as TranscriptionJobResponse;
         const platforms = job.data.platforms;
+        this.logger.log({ parentJobResult });
         const { text, userId, uploadId } = parentJobResult;
 
         for (const platform of platforms) {
@@ -47,6 +51,8 @@ export class LLMConsumer extends WorkerHost {
           const prompt = promptFn(text);
           const generatedContent = await this.contentService.generate(prompt);
 
+          this.logger.log({ generatedContent });
+
           await this.contentModel.create({
             user_id: userId,
             platform,
@@ -56,6 +62,7 @@ export class LLMConsumer extends WorkerHost {
         }
       }
     } catch (error) {
+      this.logger.error({ message: error?.message, stack: error?.stack });
       throw new Error('An error occurred in llm queue');
     }
   }
