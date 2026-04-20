@@ -5,9 +5,8 @@ import defaultConfig from 'src/config/default.config';
 import { TranscriptionModule } from 'src/transcription/transcription.module';
 import { AwsModule } from 'src/integrations/aws/aws.module';
 import { UploadModule } from 'src/upload/upload.module';
-import { UploadConsumer } from './upload.consumer';
 import { TranscriptionConsumer } from './transcription.consumer';
-import { LLMConsumer } from './llm.consumer';
+import { GenerateContentQueue } from './generate-content.consumer';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Upload, UploadSchema } from 'src/upload/schemas/upload.schema';
 import awsConfig from 'src/config/aws.config';
@@ -19,7 +18,7 @@ import { Content, ContentSchema } from 'src/content/schemas/content.schema';
 import { ContentModule } from 'src/content/content.module';
 
 @Module({
-  providers: [TranscriptionConsumer, LLMConsumer],
+  providers: [TranscriptionConsumer, GenerateContentQueue],
   imports: [
     UploadModule,
     TranscriptionModule,
@@ -52,7 +51,7 @@ import { ContentModule } from 'src/content/content.module';
       imports: [ConfigModule],
       inject: [defaultConfig.KEY],
       useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
-        name: configService.llmQueue,
+        name: configService.generateContentQueue,
         defaultJobOptions: {
           removeOnComplete: configService.removeOnCompleteValue,
           removeOnFail: { count: configService.removeOnFailCount },

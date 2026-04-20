@@ -37,9 +37,15 @@ export class AuthenticationService {
 
     if (!validUser) throw new NotFoundException('User not found');
 
+    const payload = { 
+      sub: validUser.id, 
+      id: validUser.id,
+      email: validUser.email 
+    };
+
     return {
       user: validUser,
-      access_token: this.jwtService.sign(validUser),
+      access_token: this.jwtService.sign(payload),
     };
   }
 

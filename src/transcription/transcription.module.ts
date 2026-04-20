@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TranscriptionService } from './transcription.service';
 import { TranscriptionController } from './transcription.controller';
 import { WhisperApiService } from '../integrations/whisper-api/whisper-api.service';
+import { LocalWhisperService } from '../integrations/whisper-api/local-whisper.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import {
   Transcription,
@@ -9,7 +10,8 @@ import {
 } from './schemas/transcription.schema';
 import { ConfigModule } from '@nestjs/config';
 import defaultConfig from 'src/config/default.config';
-import { ConsumersModule } from 'src/consumers/consumers.module';
+
+const isLocal = process.env.PROVIDER_MODE === 'local';
 
 @Module({
   controllers: [TranscriptionController],
@@ -23,9 +25,9 @@ import { ConsumersModule } from 'src/consumers/consumers.module';
     TranscriptionService,
     {
       provide: 'TRANSCRIPTION_PROVIDER',
-      useClass: WhisperApiService,
+      useClass: isLocal ? LocalWhisperService : WhisperApiService,
     },
   ],
-  exports: [TranscriptionService, 'TRANSCRIPTION_PROVIDER']
+  exports: [TranscriptionService, 'TRANSCRIPTION_PROVIDER'],
 })
 export class TranscriptionModule {}

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt.guard';
-import { SocialsOauthGuard } from './socials-oauth.guard';
+// import { SocialsOauthGuard } from './socials-oauth.guard';
 
 @Injectable()
 export class GlobalAuthGuard implements CanActivate {
@@ -15,7 +15,7 @@ export class GlobalAuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private jwtGuard: JwtAuthGuard,
-    private socialGuard: SocialsOauthGuard,
+    // private socialGuard: SocialsOauthGuard,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -35,14 +35,14 @@ export class GlobalAuthGuard implements CanActivate {
       message = error?.message;
     }
     // Then try Google
-    try {
-      const result = await this.socialGuard.canActivate(context);
-      if (result) return true;
-    } catch (error) {
-      console.log({ error });
-      message = error?.message;
-      this.logger.error(error.message, error.stack);
-    }
+    // try {
+    //   const result = await this.socialGuard.canActivate(context);
+    //   if (result) return true;
+    // } catch (error) {
+    //   console.log({ error });
+    //   message = error?.message;
+    //   this.logger.error(error.message, error.stack);
+    // }
 
     throw new UnauthorizedException(
       message || 'No valid authentication method found',

@@ -19,7 +19,7 @@ import { ConsumersModule } from './consumers/consumers.module';
 import { NotificationModule } from './notification/notification.module';
 import { ContentModule } from './content/content.module';
 import { JwtAuthGuard } from './authentication/guard/jwt.guard';
-import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
+// import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
 import { AwsModule } from './integrations/aws/aws.module';
 
@@ -38,8 +38,8 @@ import { AwsModule } from './integrations/aws/aws.module';
     AuthenticationModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
+      inject: [defaultConfig.KEY],
+      useFactory: (configService: ConfigType<typeof defaultConfig>) => ({
         connection: {
           host: configService.redisHost,
           port: configService.redisPort,
@@ -50,7 +50,7 @@ import { AwsModule } from './integrations/aws/aws.module';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       inject: [databaseConfig.KEY],
-      useFactory: async (dbConfig: ConfigType<typeof databaseConfig>) => ({
+      useFactory: (dbConfig: ConfigType<typeof databaseConfig>) => ({
         uri: dbConfig.url,
       }),
     }),
@@ -69,7 +69,7 @@ import { AwsModule } from './integrations/aws/aws.module';
       useClass: ResponseInterceptor,
     },
     JwtAuthGuard,
-    SocialsOauthGuard,
+    // SocialsOauthGuard,
     {
       provide: 'APP_GUARD',
       useClass: GlobalAuthGuard,

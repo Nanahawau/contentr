@@ -21,6 +21,8 @@ export class ChatcompletionApiService implements ContentInterface {
       input: prompt,
     });
 
+    console.log({ response });
+
     return response.output_text;
   }
 }

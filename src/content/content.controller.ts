@@ -25,9 +25,4 @@ export class ContentController {
   update(@Param('id') id: string, @Body() updateContentDto: UpdateContentDto) {
     return this.contentService.update(+id, updateContentDto);
   }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.contentService.remove(+id);
-  }
 }

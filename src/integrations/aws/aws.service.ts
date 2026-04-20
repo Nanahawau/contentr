@@ -16,6 +16,10 @@ export class AwsService {
     this.bucketName = config.bucket;
     this.client = new S3Client({
       region: config.region,
+      ...(config.endpoint && {
+        endpoint: config.endpoint,
+        forcePathStyle: true,
+      }),
       credentials: {
         accessKeyId: config.accessKeyID,
         secretAccessKey: config.secretKeyID,

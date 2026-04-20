@@ -8,7 +8,7 @@ export default registerAs('defaultConfig', () => ({
   openAIContentGenerationModel: process.env.OPEN_AI_CONTENT_GENERATION_MODEL || '',
   uploadQueue: process.env.UPLOAD_QUEUE || 'uploadQueue',
   transcriptionQueue: process.env.TRANSCRIPTION_QUEUE || 'transcriptionQueue',
-  llmQueue: process.env.LLM_QUEUE || 'llmQueue',
+  generateContentQueue: process.env.GENERATE_CONTENT_QUEUE || 'generateContentQueue',
   redisHost: process.env.REDIS_HOST || 'localhost',
   redisPort: parseInt(process.env.REDIS_PORT || '') || 6379,
   removeOnCompleteValue:

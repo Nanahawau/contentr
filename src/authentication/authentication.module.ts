@@ -7,8 +7,8 @@ import { UserModule } from '../user/user.module';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import googleOauthConfig from 'src/config/google-oauth.config';
 import { JwtStrategy } from './strategy/jwt.strategy';
-import { GoogleOauthStrategy } from './strategy/social.strategy';
-import { SocialsOauthGuard } from './guard/socials-oauth.guard';
+// import { GoogleOauthStrategy } from './strategy/social.strategy';
+// import { SocialsOauthGuard } from './guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './guard/globalauth.guard';
 import { JwtAuthGuard } from './guard/jwt.guard';
 import jwtConfig from 'src/config/jwt.config';
@@ -32,8 +32,8 @@ import jwtConfig from 'src/config/jwt.config';
   providers: [
     AuthenticationService,
     JwtStrategy,
-    GoogleOauthStrategy,
-    SocialsOauthGuard,
+    // GoogleOauthStrategy,
+    // SocialsOauthGuard,
     GlobalAuthGuard,
     JwtAuthGuard,
   ],

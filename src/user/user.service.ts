@@ -56,16 +56,17 @@ export class UserService {
     return bcrypt.compare(providedPassword, foundPassword);
   }
 
-  /**
+    /**
    * Returns valid user object
    * @param user
    */
-  userObject(user: User) {
+  userObject(user: any) {
+    const userJson = user.toJSON ? user.toJSON() : user;
     return {
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      verified: user.verified,
+      id: userJson.id || user._id?.toString(),
+      email: userJson.email || user.email,
+      first_name: userJson.first_name || user.first_name,
+      last_name: userJson.last_name || user.last_name,
     };
   }
 }

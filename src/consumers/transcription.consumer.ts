@@ -7,7 +7,6 @@ import { TranscriptionService } from 'src/transcription/transcription.service';
 import {
   TranscriptionJobData,
   TranscriptionJobResponse,
-  UploadJobResponse,
 } from './consumers.type';
 import { Logger } from '@nestjs/common';
 import { getQueueName } from 'src/common/helpers/helper-functions';
@@ -33,6 +32,7 @@ export class TranscriptionConsumer extends WorkerHost {
   ): Promise<TranscriptionJobResponse> {
     this.logger.log({
       message: 'transcription consumer has started running',
+      queueName: job.queueName,
     });
     try {
       let transcription;

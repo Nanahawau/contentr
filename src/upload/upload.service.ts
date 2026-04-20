@@ -23,13 +23,14 @@ export class UploadService {
     @InjectModel(Upload.name) private readonly uploadModel: Model<Upload>,
   ) {}
   async create(createUploadDto: CreateUploadDto): Promise<void> {
-    const { file, platforms } = createUploadDto;
+    const { file, platforms, user } = createUploadDto;
 
     if (!Array.isArray(platforms))
       throw new BadRequestException('Platforms is not an array');
 
     const hashedFile = generateFileHash(file);
-    const userId = '1'; // todo: get from auth context
+    console.log({user})
+    const userId = user.id;
 
     let uploadedFile = await this.uploadModel.findOne({ hash: hashedFile });
     const key = generateS3Key(userId, file.originalname);
@@ -52,7 +53,7 @@ export class UploadService {
 
     await this.flowProducer.add({
       name: 'generateContent',
-      queueName: this.configService.llmQueue,
+      queueName: this.configService.generateContentQueue,
       data: { platforms },
       children: [
         {

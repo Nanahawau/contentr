@@ -4,7 +4,18 @@ import * as bcrypt from 'bcrypt';
 
 export type UserDocument = HydratedDocument<User>;
 
-@Schema()
+@Schema({
+  toJSON: {
+    virtuals: true,
+    transform: function (_doc: any, ret: any) {
+      const { _id, __v, password, ...rest } = ret;
+      return {
+        ...rest,
+        id: _id.toString(),
+      };
+    },
+  },
+})
 export class User {
   @Prop({ required: true, index: true })
   email: string;
@@ -29,4 +40,8 @@ UserSchema.pre<UserDocument>('save', async function (next) {
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
+});
+
+UserSchema.virtual('id').get(function () {
+  return this._id.toHexString();
 });
