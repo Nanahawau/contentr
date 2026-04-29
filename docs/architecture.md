@@ -1,6 +1,6 @@
 # Contentr — System Architecture
 
-**Version**: 1.4  
+**Version**: 1.5  
 **Last Updated**: 2026-04-20  
 **Status**: MVP — Active Development
 
@@ -88,9 +88,24 @@ Bulk purchases are cheaper per credit. This incentivises higher upfront spend an
 | Audio/Video transcription | 10 per minute | Rounded up to nearest minute |
 | Text ingestion | 5 per 1,000 words | Rounded up |
 | Storage fee | 1 per 100MB | Rounded up, charged at upload |
-| Content generation per platform | Tiered (see below) | Based on transcript length |
+| Content generation per platform | Tiered (see below) | Rate depends on platform type + transcript length |
 
-**Generation credit tiers (per platform):**
+**Supported platforms (MVP):**
+
+| Platform | Type | Output |
+|---|---|---|
+| `twitter` | Post (thread) | Array of tweets, 280 chars each |
+| `linkedin` | Post | Single long-form post, 1,300–3,000 chars |
+| `instagram_caption` | Caption only | Caption + hashtags, 2,200 chars max |
+| `instagram_reel` | Script | Vertical video script, 15–90 sec spoken |
+| `tiktok` | Script | Vertical video script, 60–90 sec spoken |
+| `youtube_shorts` | Script + title | Vertical video script, 45–60 sec + 100-char title |
+
+Platforms are selected individually at upload time. Instagram Caption and Instagram Reel are separate options — users pick only what they need.
+
+**Generation credit tiers:**
+
+Caption-format platforms (`twitter`, `linkedin`, `instagram_caption`):
 
 | Transcript Length | Credits per Platform |
 |---|---|
@@ -99,15 +114,26 @@ Bulk purchases are cheaper per credit. This incentivises higher upfront spend an
 | 30–60 min / ≤9,000 words | 12 credits |
 | 60+ min | 18 credits |
 
+Script-format platforms (`instagram_reel`, `tiktok`, `youtube_shorts`):
+
+| Transcript Length | Credits per Platform |
+|---|---|
+| 0–5 min / ≤750 words | 10 credits |
+| 5–30 min / ≤4,500 words | 15 credits |
+| 30–60 min / ≤9,000 words | 20 credits |
+| 60+ min | 30 credits |
+
+Scripts cost more because the LLM output is longer, more structured, and requires tighter format adherence (hooks, pacing cues, spoken language adaptation).
+
 In practice, transcripts longer than ~4,000 words are summarised before being passed to the LLM. This caps input token cost, keeps generation quality consistent (LLMs drift on very long inputs), and allows flat-rate pricing within each tier. The summarisation is transparent — users are not charged separately for it.
 
-**Example — 10-minute video (100MB) to 4 platforms:**  
-Transcription: 100 credits + Storage: 1 credit + Generation (5–30 min tier): 32 credits = **133 credits (~$1.33)**  
-Our actual cost: ~$0.29 → gross margin ~78%
+**Example — 10-minute video (100MB) to Twitter + LinkedIn + Instagram Caption + TikTok:**  
+Transcription: 100 credits + Storage: 1 credit + Captions (8 × 3): 24 credits + Script (15 × 1): 15 credits = **140 credits (~$1.40)**  
+Our actual cost: ~$0.31 → gross margin ~78%
 
-**Example — 90-minute podcast (500MB) to 4 platforms:**  
-Transcription: 900 credits + Storage: 5 credits + Generation (60+ min tier): 72 credits = **977 credits (~$9.77)**  
-Our actual cost: ~$1.85 → gross margin ~81%
+**Example — 90-minute podcast (500MB) to LinkedIn + YouTube Shorts:**  
+Transcription: 900 credits + Storage: 5 credits + Caption (18 × 1): 18 credits + Script (30 × 1): 30 credits = **953 credits (~$9.53)**  
+Our actual cost: ~$1.72 → gross margin ~82%
 
 ### Credit Flow (Reserve → Confirm → Refund)
 
@@ -343,8 +369,16 @@ Transcription {
 Content {
   upload_id       string (indexed)
   user_id         string (indexed)
-  platform        string             // 'twitter' | 'linkedin' | 'instagram' | 'tiktok'
-  content         string
+  platform        string             // 'twitter' | 'linkedin' | 'instagram_caption' |
+                                     // 'instagram_reel' | 'tiktok' | 'youtube_shorts'
+  format          string             // 'post' | 'thread' | 'caption' | 'script'
+  content         string | string[]  // string[] for twitter threads; string for all others
+  metadata        {
+    char_count              number   // total character count
+    tweet_count             number   // twitter only
+    estimated_duration_sec  number   // script platforms only (reel, tiktok, shorts)
+    title                   string   // youtube_shorts only
+  }
   provider        string             // 'gpt-4o' | 'llama3' | etc.
   version         number             // supports regeneration history
   created_at      Date
