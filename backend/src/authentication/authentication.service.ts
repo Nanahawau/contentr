@@ -1,0 +1,62 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { UserService } from '../user/user.service';
+import { JwtService } from '@nestjs/jwt';
+
+@Injectable()
+export class AuthenticationService {
+  constructor(
+    private userService: UserService,
+    private jwtService: JwtService,
+  ) {}
+
+  async validateUser(
+    user: { email: string; password: string },
+    provider = 'default',
+  ) {
+    const { email, password } = user;
+    const foundUser = await this.userService.findOne({ email, provider });
+
+    if (!foundUser) throw new BadRequestException('User does not exist');
+
+    const passwordMatch = await this.userService.isValidPassword(
+      foundUser.password,
+      password,
+    );
+
+    const isValidUser = foundUser && passwordMatch;
+
+    return isValidUser ? this.userService.userObject(foundUser) : null;
+  }
+
+  async login(user: { email: string; password: string }, provider = 'default') {
+    const validUser = await this.validateUser(user, provider);
+
+    if (!validUser) throw new NotFoundException('User not found');
+
+    const payload = { 
+      sub: validUser.id, 
+      id: validUser.id,
+      email: validUser.email 
+    };
+
+    return {
+      user: validUser,
+      access_token: this.jwtService.sign(payload),
+    };
+  }
+
+  async register(user: { email: string; password: string }) {
+    return this.userService.create(user);
+  }
+
+  async sign(user: any) {
+    return {
+      user,
+      access_token: this.jwtService.sign(user),
+    };
+  }
+}
