@@ -10,6 +10,7 @@ async function bootstrap() {
   app.use(compression());
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalInterceptors(new LoggingInterceptor());
+  app.setGlobalPrefix('api');
 
   const config = new DocumentBuilder()
     .setTitle('contentr')
