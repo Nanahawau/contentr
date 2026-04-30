@@ -1,0 +1,94 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - '${MONGO_PORT:-27017}:27017'
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+
+  minio:
+    image: minio/minio
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    env_file:
+      - ./backend/.env.local
+    command: server /data --console-address ':9001'
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        until /usr/bin/mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}; do sleep 1; done;
+        /usr/bin/mc mb --ignore-existing local/$${BUCKET_NAME:-contentr-media};
+        /usr/bin/mc anonymous set public local/$${BUCKET_NAME:-contentr-media};
+      "
+    env_file:
+      - ./backend/.env.local
+
+  whisper:
+    image: onerahmet/openai-whisper-asr-webservice:latest
+    ports:
+      - '9002:9000'
+    env_file:
+      - ./backend/.env.local
+    environment:
+      ASR_MODEL: ${WHISPER_MODEL:-base}
+      ASR_ENGINE: openai_whisper
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - '11434:11434'
+    volumes:
+      - ollama_data:/root/.ollama
+
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
+  backend:
+    build: ./backend
+    ports:
+      - '3000:3000'
+    env_file:
+      - ./backend/.env.local
+    environment:
+      MONGO_URL: mongodb://mongo:27017/contentr
+      REDIS_HOST: redis
+      AWS_ENDPOINT: http://minio:9000
+      LOCAL_WHISPER_URL: http://whisper:9000/v1
+      LOCAL_OLLAMA_URL: http://ollama:11434/v1
+    depends_on:
+      - mongo
+      - redis
+      - minio
+      - minio-init
+      - whisper
+      - ollama
+
+  frontend:
+    build: ./frontend
+    ports:
+      - '4200:80'
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  redis_data:
+  minio_data:
+  ollama_data:
