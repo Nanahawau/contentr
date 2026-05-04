@@ -4,11 +4,12 @@ import { AppService } from './app.service';
 import { AuthenticationModule } from './authentication/authentication.module';
 import { UserModule } from './user/user.module';
 import databaseConfig from './config/database.config';
-import { ConfigModule, ConfigService, ConfigType } from '@nestjs/config';
+import { ConfigModule, ConfigType } from '@nestjs/config';
 import defaultConfig from './config/default.config';
 import googleOauthConfig from './config/google-oauth.config';
 import jwtConfig from './config/jwt.config';
 import awsConfig from './config/aws.config';
+import emailConfig from './config/email.config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ResponseInterceptor } from './common/interceptor/response.interceptor';
@@ -19,7 +20,7 @@ import { ConsumersModule } from './consumers/consumers.module';
 import { NotificationModule } from './notification/notification.module';
 import { ContentModule } from './content/content.module';
 import { JwtAuthGuard } from './authentication/guard/jwt.guard';
-// import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
+import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
 import { AwsModule } from './integrations/aws/aws.module';
 
@@ -32,6 +33,7 @@ import { AwsModule } from './integrations/aws/aws.module';
         googleOauthConfig,
         jwtConfig,
         awsConfig,
+        emailConfig,
       ],
       isGlobal: true,
     }),
@@ -69,7 +71,7 @@ import { AwsModule } from './integrations/aws/aws.module';
       useClass: ResponseInterceptor,
     },
     JwtAuthGuard,
-    // SocialsOauthGuard,
+    SocialsOauthGuard,
     {
       provide: 'APP_GUARD',
       useClass: GlobalAuthGuard,

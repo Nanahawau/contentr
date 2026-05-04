@@ -7,45 +7,44 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtAuthGuard } from './jwt.guard';
-// import { SocialsOauthGuard } from './socials-oauth.guard';
+import { SocialsOauthGuard } from './socials-oauth.guard';
 
 @Injectable()
 export class GlobalAuthGuard implements CanActivate {
   private readonly logger = new Logger(GlobalAuthGuard.name);
+
   constructor(
     private reflector: Reflector,
     private jwtGuard: JwtAuthGuard,
-    // private socialGuard: SocialsOauthGuard,
+    private socialGuard: SocialsOauthGuard,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // Public routes
     const isPublic = this.reflector.get<boolean>(
       'isPublic',
       context.getHandler(),
     );
     if (isPublic) return true;
 
-    let message = null;
+    let lastError: string = 'No valid authentication method found';
 
-    // Try JWT first
     try {
       if (await this.jwtGuard.canActivate(context)) return true;
     } catch (error) {
-      message = error?.message;
+      if (error instanceof Error) lastError = error.message;
     }
-    // Then try Google
-    // try {
-    //   const result = await this.socialGuard.canActivate(context);
-    //   if (result) return true;
-    // } catch (error) {
-    //   console.log({ error });
-    //   message = error?.message;
-    //   this.logger.error(error.message, error.stack);
-    // }
+
+    try {
+      if (await this.socialGuard.canActivate(context)) return true;
+    } catch (error) {
+      if (error instanceof Error) {
+        this.logger.error(error.message, error.stack);
+        lastError = error.message;
+      }
+    }
 
     throw new UnauthorizedException(
-      message || 'No valid authentication method found',
+      lastError || 'No valid authentication method found',
     );
   }
 }
