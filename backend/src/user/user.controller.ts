@@ -1,10 +1,15 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { UserService } from './user.service';
+import { CurrentUser } from 'src/common/decorator/current-user.decorator';
+
+type AuthenticatedUser = { id: string; email: string };
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @Post('/email-confirmation')
-  async emailConfirmation() {}
+  @Get('me')
+  async getProfile(@CurrentUser() authenticatedUser: AuthenticatedUser) {
+    return this.userService.findById(authenticatedUser.id);
+  }
 }

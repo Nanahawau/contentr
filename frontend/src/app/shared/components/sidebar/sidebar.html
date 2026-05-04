@@ -1,0 +1,110 @@
+<aside
+  class="flex flex-col bg-stone-100 border-r border-stone-200 transition-all duration-300 h-screen"
+  [class.w-56]="!isCollapsed()"
+  [class.w-14]="isCollapsed()"
+>
+  <!-- Logo -->
+  <div class="flex items-center justify-between px-4 py-4 border-b border-stone-200">
+    @if (!isCollapsed()) {
+      <span class="text-stone-900 font-semibold text-base tracking-tight">Contentr</span>
+    }
+    <button
+      (click)="toggleSidebar()"
+      class="p-1.5 rounded-md text-stone-500 hover:bg-stone-200 hover:text-stone-900 transition-colors"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+  </div>
+
+  <!-- Nav -->
+  <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+    <a
+      routerLink="/dashboard"
+      routerLinkActive="bg-stone-200 text-stone-900"
+      class="flex items-center gap-3 px-3 py-2 rounded-md text-stone-600 hover:bg-stone-200 hover:text-stone-900 transition-colors text-sm"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0h6" />
+      </svg>
+      @if (!isCollapsed()) {
+        <span>Home</span>
+      }
+    </a>
+
+    <a
+      routerLink="/uploads"
+      routerLinkActive="bg-stone-200 text-stone-900"
+      class="flex items-center gap-3 px-3 py-2 rounded-md text-stone-600 hover:bg-stone-200 hover:text-stone-900 transition-colors text-sm"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      @if (!isCollapsed()) {
+        <span>Uploads</span>
+      }
+    </a>
+
+    <a
+      routerLink="/content"
+      routerLinkActive="bg-stone-200 text-stone-900"
+      class="flex items-center gap-3 px-3 py-2 rounded-md text-stone-600 hover:bg-stone-200 hover:text-stone-900 transition-colors text-sm"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+      @if (!isCollapsed()) {
+        <span>Content</span>
+      }
+    </a>
+  </nav>
+
+  <!-- User section -->
+  <div class="border-t border-stone-200 px-2 py-3">
+    @if (authService.currentUser(); as currentUser) {
+      <div class="relative">
+
+        <!-- Backdrop to close menu when clicking outside -->
+        @if (showUserMenu()) {
+          <div class="fixed inset-0 z-10" (click)="closeUserMenu()"></div>
+        }
+
+        <!-- User menu popover -->
+        @if (showUserMenu()) {
+          <div class="absolute bottom-full left-0 right-0 mb-1 z-20 bg-white rounded-lg shadow-lg border border-stone-200 py-1 overflow-hidden">
+            <button
+              (click)="logout()"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Log out
+            </button>
+          </div>
+        }
+
+        <!-- Trigger: clicking the user row opens the menu -->
+        <button
+          (click)="toggleUserMenu()"
+          class="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-stone-200 transition-colors text-left"
+        >
+          <div class="w-7 h-7 rounded-full bg-stone-800 flex items-center justify-center text-white text-xs font-semibold shrink-0">
+            {{ currentUser.email[0].toUpperCase() }}
+          </div>
+          @if (!isCollapsed()) {
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-medium text-stone-900 truncate">{{ currentUser.first_name || currentUser.email }}</p>
+              <p class="text-xs text-stone-500 truncate">{{ currentUser.email }}</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-stone-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+            </svg>
+          }
+        </button>
+
+      </div>
+    }
+  </div>
+</aside>

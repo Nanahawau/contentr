@@ -1,6 +1,3 @@
-env_file:
-  - ./backend/.env
-
 services:
   mongo:
     image: mongo:7

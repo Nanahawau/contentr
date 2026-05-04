@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as compression from 'compression';
+import * as cookieParser from 'cookie-parser';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { LoggingInterceptor } from './common/interceptor/logging.interceptor';
@@ -8,6 +9,7 @@ import { LoggingInterceptor } from './common/interceptor/logging.interceptor';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(compression());
+  app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe());
   app.useGlobalInterceptors(new LoggingInterceptor());
   app.setGlobalPrefix('api');

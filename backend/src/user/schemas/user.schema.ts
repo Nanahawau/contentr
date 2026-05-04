@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { Credits, CreditsSchema } from './credits.schema';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -19,16 +20,24 @@ export type UserDocument = HydratedDocument<User>;
 export class User {
   @Prop({ required: true, index: true })
   email: string;
-  @Prop({ nullable: true })
+
+  @Prop()
   password: string;
-  @Prop({ nullable: false })
-  verified: boolean = false;
-  @Prop({ nullable: true })
+
+  @Prop({ default: false })
+  verified: boolean;
+
+  @Prop()
   first_name?: string;
-  @Prop({ nullable: true })
+
+  @Prop()
   last_name?: string;
-  @Prop({ nullable: false })
-  provider?: string = 'default';
+
+  @Prop({ default: 'default' })
+  provider: string;
+
+  @Prop({ type: CreditsSchema, default: () => ({ balance: 0, reserved: 0, lifetime_used: 0 }) })
+  credits: Credits;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

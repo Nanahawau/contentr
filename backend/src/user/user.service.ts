@@ -1,72 +1,92 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import { User } from './schemas/user.schema';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { User, UserDocument } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { InjectModel } from '@nestjs/mongoose';
 import { CreateUserDto } from './dtos/create-user.dto';
+import { ConfigType } from '@nestjs/config';
+import defaultConfig from 'src/config/default.config';
+
+export type UserObject = {
+  id: string;
+  email: string;
+  verified: boolean;
+  first_name?: string;
+  last_name?: string;
+  credits: {
+    balance: number;
+    reserved: number;
+    lifetime_used: number;
+  };
+};
 
 @Injectable()
 export class UserService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<User>,
+    @Inject(defaultConfig.KEY) private config: ConfigType<typeof defaultConfig>,
+  ) {}
 
-  /**
-   * Finds a user by email and provider.
-   * @param user
-   */
-  async findOne(user: { email: string; provider: string }) {
-    const { email, provider = 'default' } = user;
-    const foundUser = await this.userModel.findOne({ email, provider });
-
-    return foundUser || null;
+  async findOne(
+    email: string,
+    provider: string = 'default',
+  ): Promise<UserDocument | null> {
+    return this.userModel.findOne({ email, provider });
   }
 
-  /**
-   * Creates user.
-   * @param user
-   */
-  async create(user: {
-    email: string;
-    password?: string;
-    provider?: string;
-    first_name?: string;
-  }) {
-    const provider = user.provider || 'default';
-    const foundUser = await this.userModel.findOne({
-      email: user.email,
+  async findById(userId: string): Promise<UserDocument | null> {
+    return this.userModel.findById(userId);
+  }
+
+  async create(
+    createUserDto: Omit<CreateUserDto, 'password'> & {
+      password?: string;
+      provider?: string;
+      first_name?: string;
+    },
+  ): Promise<UserObject> {
+    const provider = createUserDto.provider ?? 'default';
+    const existingUser = await this.userModel.findOne({
+      email: createUserDto.email,
       provider,
     });
 
-    if (foundUser) {
+    if (existingUser)
       throw new BadRequestException('User already exists, please log in');
-    }
 
-    const createdUser = await this.userModel.create({ ...user, provider });
+    const createdUser = await this.userModel.create({
+      ...createUserDto,
+      provider,
+      credits: {
+        balance: this.config.freeCreditsOnSignup,
+        reserved: 0,
+        lifetime_used: 0,
+      },
+    });
+
     return this.userObject(createdUser);
   }
 
-  /**
-   * Checks if password is valid
-   * @param foundPassword
-   * @param providedPassword
-   */
-  async isValidPassword(
-    foundPassword: string,
-    providedPassword: string,
-  ): Promise<boolean> {
-    return bcrypt.compare(providedPassword, foundPassword);
+  async markVerified(userId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, { verified: true });
   }
 
-    /**
-   * Returns valid user object
-   * @param user
-   */
-  userObject(user: any) {
-    const userJson = user.toJSON ? user.toJSON() : user;
+  async isValidPassword(
+    hashedPassword: string,
+    plainPassword: string,
+  ): Promise<boolean> {
+    return bcrypt.compare(plainPassword, hashedPassword);
+  }
+
+  userObject(userDocument: UserDocument): UserObject {
+    const user = userDocument.toJSON<UserDocument & { id: string }>();
     return {
-      id: userJson.id || user._id?.toString(),
-      email: userJson.email || user.email,
-      first_name: userJson.first_name || user.first_name,
-      last_name: userJson.last_name || user.last_name,
+      id: user.id as string,
+      email: user.email,
+      verified: user.verified,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      credits: user.credits,
     };
   }
 }
