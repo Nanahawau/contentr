@@ -19,4 +19,5 @@ export default registerAs('defaultConfig', () => ({
   backOffDelay: parseInt(process.env.BACKOFF_DELAY || '') || 5000,
   queueFailureAttempts: parseInt(process.env.QUEUE_FAILURE_ATTEMPTS || '') || 3,
   freeCreditsOnSignup: parseInt(process.env.FREE_CREDITS_ON_SIGNUP || '') || 500,
+  maxUploadSizeMb: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '') || 100,
 }));

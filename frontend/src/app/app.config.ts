@@ -5,6 +5,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { responseInterceptor } from './core/interceptors/response.interceptor';
 import { authInitializer } from './core/initializers/auth.initializer';
+import { configInitializer } from './core/initializers/config.initializer';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -12,5 +13,6 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor, responseInterceptor])),
     { provide: APP_INITIALIZER, useFactory: authInitializer, multi: true },
+    { provide: APP_INITIALIZER, useFactory: configInitializer, multi: true },
   ],
 };

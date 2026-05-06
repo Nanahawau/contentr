@@ -3,6 +3,7 @@ import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { Platform } from './enums/platform.enum';
 import { UploadStatus } from './enums/upload-status.enum';
+import defaultConfig from '../config/default.config';
 
 const mockUpload = {
   _id: 'upload-id-123',
@@ -44,7 +45,10 @@ describe('UploadController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [UploadController],
-      providers: [{ provide: UploadService, useValue: mockUploadService }],
+      providers: [
+        { provide: UploadService, useValue: mockUploadService },
+        { provide: defaultConfig.KEY, useValue: { maxUploadSizeMb: 100 } },
+      ],
     }).compile();
 
     controller = module.get<UploadController>(UploadController);

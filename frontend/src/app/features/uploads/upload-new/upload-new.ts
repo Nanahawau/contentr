@@ -2,6 +2,7 @@ import { Component, inject, signal, ElementRef, viewChild } from '@angular/core'
 import { Router, RouterLink } from '@angular/router';
 import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { UploadService } from '../../../core/services/upload.service';
+import { ConfigService } from '../../../core/services/config.service';
 import { ALL_PLATFORMS, Platform, PLATFORM_LABELS, Upload } from '../../../core/models/upload.model';
 import { Sidebar } from '../../../shared/components/sidebar/sidebar';
 import { TopBar } from '../../../shared/components/top-bar/top-bar';
@@ -15,6 +16,7 @@ type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 })
 export class UploadNew {
   private readonly uploadService = inject(UploadService);
+  private readonly configService = inject(ConfigService);
   private readonly router = inject(Router);
 
   readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
@@ -105,6 +107,12 @@ export class UploadNew {
   }
 
   private setFile(file: File): void {
+    const maxBytes = this.configService.maxUploadSizeMb() * 1024 * 1024;
+    if (file.size > maxBytes) {
+      this.uploadState.set('error');
+      this.errorMessage.set(`File too large. Maximum size is ${this.configService.maxUploadSizeMb()}MB.`);
+      return;
+    }
     this.selectedFile.set(file);
     this.uploadState.set('idle');
     this.errorMessage.set('');

@@ -1,31 +1,37 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
-  Post,
+  Inject,
   Param,
+  Post,
   Query,
-  UseInterceptors,
   UploadedFile,
+  UseGuards,
+  UseInterceptors,
   ParseFilePipe,
   FileTypeValidator,
-  MaxFileSizeValidator,
-  UseGuards,
   ParseIntPipe,
   DefaultValuePipe,
-  Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ConfigType } from '@nestjs/config';
 import { UploadService } from './upload.service';
 import { CurrentUser } from 'src/common/decorator/current-user.decorator';
 import { VerifiedGuard } from 'src/common/guard/verified.guard';
 import { Platform } from './enums/platform.enum';
+import defaultConfig from 'src/config/default.config';
 
 type AuthenticatedUser = { id: string; email: string; verified: boolean };
 
 @Controller('uploads')
 @UseGuards(VerifiedGuard)
 export class UploadController {
-  constructor(private readonly uploadService: UploadService) {}
+  constructor(
+    private readonly uploadService: UploadService,
+    @Inject(defaultConfig.KEY) private readonly config: ConfigType<typeof defaultConfig>,
+  ) {}
 
   @Post()
   @UseInterceptors(FileInterceptor('file'))
@@ -36,10 +42,6 @@ export class UploadController {
           new FileTypeValidator({
             fileType: /(audio\/.*|video\/mp4|text\/.*|application\/pdf)$/i,
           }),
-          new MaxFileSizeValidator({
-            maxSize: 100 * 1024 * 1024,
-            message: 'File too large. Maximum size is 100MB.',
-          }),
         ],
         fileIsRequired: true,
       }),
@@ -48,6 +50,13 @@ export class UploadController {
     @Body('platforms') platformsJson: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    const maxBytes = this.config.maxUploadSizeMb * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new BadRequestException(
+        `File too large. Maximum size is ${this.config.maxUploadSizeMb}MB.`,
+      );
+    }
+
     const platforms = JSON.parse(platformsJson) as Platform[];
     return this.uploadService.create({ file, platforms, userId: user.id });
   }
