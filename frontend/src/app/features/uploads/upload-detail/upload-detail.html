@@ -72,6 +72,22 @@
           <div class="bg-white border border-stone-200 rounded-2xl p-6">
             <p class="text-stone-500 text-xs font-medium uppercase tracking-wide mb-4">Details</p>
             <dl class="space-y-3">
+              <div class="flex justify-between text-sm items-center">
+                <dt class="text-stone-500">Quality score</dt>
+                <dd>
+                  <span
+                    class="px-2.5 py-1 text-xs font-semibold rounded-full"
+                    [class.bg-emerald-100]="upload.quality_score >= 7"
+                    [class.text-emerald-800]="upload.quality_score >= 7"
+                    [class.bg-amber-100]="upload.quality_score >= 4 && upload.quality_score < 7"
+                    [class.text-amber-800]="upload.quality_score >= 4 && upload.quality_score < 7"
+                    [class.bg-red-100]="upload.quality_score < 4"
+                    [class.text-red-800]="upload.quality_score < 4"
+                  >
+                    {{ upload.quality_score }}/10
+                  </span>
+                </dd>
+              </div>
               <div class="flex justify-between text-sm">
                 <dt class="text-stone-500">Uploaded</dt>
                 <dd class="text-stone-900 font-medium">{{ formatDate(upload.createdAt) }}</dd>

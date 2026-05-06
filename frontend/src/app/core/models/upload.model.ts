@@ -22,6 +22,7 @@ export interface Upload {
   file_size: number;
   platforms: Platform[];
   status: UploadStatus;
+  quality_score: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -29,4 +30,13 @@ export interface Upload {
 export interface UploadsPage {
   uploads: Upload[];
   nextCursor: string | null;
+}
+
+export type QualityBand = 'pass' | 'warn';
+
+export interface AnalyseResult {
+  score: number;
+  band: QualityBand;
+  reason: string;
+  analysisToken: string;
 }

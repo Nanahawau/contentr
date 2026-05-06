@@ -7,7 +7,7 @@ import { ALL_PLATFORMS, Platform, PLATFORM_LABELS, Upload } from '../../../core/
 import { Sidebar } from '../../../shared/components/sidebar/sidebar';
 import { TopBar } from '../../../shared/components/top-bar/top-bar';
 
-type UploadState = 'idle' | 'uploading' | 'success' | 'error';
+type UploadState = 'idle' | 'analysing' | 'warn' | 'uploading' | 'success' | 'error';
 
 @Component({
   selector: 'app-upload-new',
@@ -16,7 +16,7 @@ type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 })
 export class UploadNew {
   private readonly uploadService = inject(UploadService);
-  private readonly configService = inject(ConfigService);
+  protected readonly configService = inject(ConfigService);
   private readonly router = inject(Router);
 
   readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
@@ -27,6 +27,10 @@ export class UploadNew {
   protected readonly uploadState = signal<UploadState>('idle');
   protected readonly progress = signal(0);
   protected readonly errorMessage = signal('');
+  protected readonly warningMessage = signal('');
+  protected readonly qualityScore = signal(0);
+
+  private pendingAnalysisToken = '';
 
   protected readonly allPlatforms = ALL_PLATFORMS;
   protected readonly platformLabels = PLATFORM_LABELS;
@@ -79,14 +83,53 @@ export class UploadNew {
     const file = this.selectedFile();
     if (!file || !this.canUpload) return;
 
+    this.uploadState.set('analysing');
+
+    this.uploadService.analyse(file).subscribe({
+      next: (result) => {
+        if (result.band === 'warn') {
+          this.pendingAnalysisToken = result.analysisToken;
+          this.qualityScore.set(result.score);
+          this.warningMessage.set(result.reason);
+          this.uploadState.set('warn');
+        } else {
+          this.proceedWithUpload(file, result.analysisToken);
+        }
+      },
+      error: (error) => {
+        const reason = error.error?.reason ?? 'File did not pass quality check. Please try a different file.';
+        this.uploadState.set('error');
+        this.errorMessage.set(reason);
+      },
+    });
+  }
+
+  protected confirmUpload(): void {
+    const file = this.selectedFile();
+    if (!file || !this.pendingAnalysisToken) return;
+    this.proceedWithUpload(file, this.pendingAnalysisToken);
+  }
+
+  protected cancelUpload(): void {
+    this.pendingAnalysisToken = '';
+    this.uploadState.set('idle');
+  }
+
+  protected formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  private proceedWithUpload(file: File, analysisToken: string): void {
     const platforms = Array.from(this.selectedPlatforms());
     this.uploadState.set('uploading');
     this.progress.set(0);
 
-    this.uploadService.upload(file, platforms).subscribe({
+    this.uploadService.upload(file, platforms, analysisToken).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress && event.total) {
-          this.progress.set(Math.round(100 * event.loaded / event.total));
+          this.progress.set(Math.round((100 * event.loaded) / event.total));
         } else if (event instanceof HttpResponse) {
           this.uploadState.set('success');
           const upload = event.body as Upload;
@@ -95,15 +138,9 @@ export class UploadNew {
       },
       error: () => {
         this.uploadState.set('error');
-        this.errorMessage.set('Upload failed. Please check your file type and try again.');
+        this.errorMessage.set('Upload failed. Please check your file and try again.');
       },
     });
-  }
-
-  protected formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   private setFile(file: File): void {

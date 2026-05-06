@@ -17,6 +17,7 @@ const mockUpload = {
   file_size: 2048,
   platforms: [Platform.TWITTER, Platform.LINKEDIN],
   status: UploadStatus.PENDING,
+  quality_score: 8,
 };
 
 const mockFile: Express.Multer.File = {
@@ -37,14 +38,14 @@ const mockUser = {
   email: 'user@example.com',
   verified: true,
 };
+const mockResponse = { status: jest.fn() };
 
 const mockUploadService = {
+  analyse: jest.fn(),
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
 };
-
-const mockResponse = { status: jest.fn() };
 
 describe('UploadController', () => {
   let controller: UploadController;
@@ -62,6 +63,33 @@ describe('UploadController', () => {
     jest.clearAllMocks();
   });
 
+  describe('analyse', () => {
+    it('delegates to service.analyse with the file and user id', async () => {
+      const analyseResult = {
+        score: 8,
+        band: 'pass',
+        reason: 'Good.',
+        analysisToken: 'token-abc',
+      };
+      mockUploadService.analyse.mockResolvedValue(analyseResult);
+
+      const result = await controller.analyse(mockFile, mockUser);
+
+      expect(mockUploadService.analyse).toHaveBeenCalledWith(
+        mockFile,
+        mockUser.id,
+      );
+      expect(result).toBe(analyseResult);
+    });
+
+    it('throws BadRequestException when file exceeds the size limit', async () => {
+      const oversizedFile = { ...mockFile, size: 200 * 1024 * 1024 };
+      await expect(
+        controller.analyse(oversizedFile, mockUser),
+      ).rejects.toThrow();
+    });
+  });
+
   describe('create', () => {
     it('returns 201 and the upload when a new file is created', async () => {
       mockUploadService.create.mockResolvedValue({
@@ -73,6 +101,7 @@ describe('UploadController', () => {
       const result = await controller.create(
         mockFile,
         JSON.stringify(platforms),
+        'valid-token',
         mockUser,
         mockResponse as never,
       );
@@ -81,6 +110,7 @@ describe('UploadController', () => {
         file: mockFile,
         platforms,
         userId: mockUser.id,
+        analysisToken: 'valid-token',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(result).toBe(mockUpload);
@@ -96,6 +126,7 @@ describe('UploadController', () => {
       const result = await controller.create(
         mockFile,
         JSON.stringify(platforms),
+        'valid-token',
         mockUser,
         mockResponse as never,
       );
