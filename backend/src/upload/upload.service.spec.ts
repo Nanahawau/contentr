@@ -81,7 +81,9 @@ describe('UploadService', () => {
     };
 
     it('throws BadRequestException when platforms array is empty', async () => {
-      await expect(service.create({ ...dto, platforms: [] })).rejects.toThrow(BadRequestException);
+      await expect(service.create({ ...dto, platforms: [] })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('uploads to S3 and creates a record when no duplicate hash exists for user', async () => {
@@ -105,30 +107,44 @@ describe('UploadService', () => {
           status: UploadStatus.PENDING,
         }),
       );
-      expect(result).toBe(mockUpload);
+      expect(result).toEqual({ upload: mockUpload, isDuplicate: false });
     });
 
-    it('reuses the existing S3 key when user already uploaded the same file', async () => {
-      mockUploadModel.findOne.mockResolvedValue(mockUpload);
+    it('returns the existing upload as a duplicate when status is pending', async () => {
+      const pendingUpload = { ...mockUpload, status: UploadStatus.PENDING };
+      mockUploadModel.findOne.mockResolvedValue(pendingUpload);
+
+      const result = await service.create(dto);
+
+      expect(result).toEqual({ upload: pendingUpload, isDuplicate: true });
+      expect(mockAwsService.uploadToS3).not.toHaveBeenCalled();
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+      expect(mockFlowProducer.add).not.toHaveBeenCalled();
+    });
+
+    it('returns the existing upload as a duplicate when status is completed', async () => {
+      const completedUpload = { ...mockUpload, status: UploadStatus.COMPLETED };
+      mockUploadModel.findOne.mockResolvedValue(completedUpload);
+
+      const result = await service.create(dto);
+
+      expect(result).toEqual({ upload: completedUpload, isDuplicate: true });
+      expect(mockUploadModel.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new record and reuses the S3 key when the existing upload has failed', async () => {
+      const failedUpload = { ...mockUpload, status: UploadStatus.FAILED };
+      mockUploadModel.findOne.mockResolvedValue(failedUpload);
       mockUploadModel.create.mockResolvedValue(mockUpload);
       mockFlowProducer.add.mockResolvedValue(undefined);
 
-      await service.create(dto);
+      const result = await service.create(dto);
 
+      expect(result.isDuplicate).toBe(false);
       expect(mockAwsService.uploadToS3).not.toHaveBeenCalled();
       expect(mockUploadModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ s3Key: mockUpload.s3Key }),
+        expect.objectContaining({ s3Key: failedUpload.s3Key }),
       );
-    });
-
-    it('always creates a new upload record even when hash already exists', async () => {
-      mockUploadModel.findOne.mockResolvedValue(mockUpload);
-      mockUploadModel.create.mockResolvedValue(mockUpload);
-      mockFlowProducer.add.mockResolvedValue(undefined);
-
-      await service.create(dto);
-
-      expect(mockUploadModel.create).toHaveBeenCalledTimes(1);
     });
 
     it('enqueues a generate-content parent job with a transcription child', async () => {
@@ -167,7 +183,10 @@ describe('UploadService', () => {
     });
 
     it('returns nextCursor and trims the extra item when results exceed the limit', async () => {
-      const uploads = Array.from({ length: 21 }, (_, i) => ({ ...mockUpload, _id: `id-${i}` }));
+      const uploads = Array.from({ length: 21 }, (_, i) => ({
+        ...mockUpload,
+        _id: `id-${i}`,
+      }));
       mockQuery.limit.mockResolvedValue(uploads);
 
       const result = await service.findAll('user-id-123', 20);
@@ -213,7 +232,9 @@ describe('UploadService', () => {
     it('throws NotFoundException when the upload does not exist', async () => {
       mockUploadModel.findOne.mockResolvedValue(null);
 
-      await expect(service.findOne('nonexistent-id', 'user-id-123')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.findOne('nonexistent-id', 'user-id-123'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('scopes the query to the requesting user', async () => {

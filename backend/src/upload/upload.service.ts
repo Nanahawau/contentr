@@ -23,7 +23,7 @@ export class UploadService {
     @InjectModel(Upload.name) private readonly uploadModel: Model<Upload>,
   ) {}
 
-  async create(createUploadDto: CreateUploadDto): Promise<UploadDocument> {
+  async create(createUploadDto: CreateUploadDto): Promise<{ upload: UploadDocument; isDuplicate: boolean }> {
     const { file, platforms, userId } = createUploadDto;
 
     if (!platforms.length) {
@@ -32,16 +32,17 @@ export class UploadService {
 
     const hash = generateFileHash(file);
 
-    const existingUpload = await this.uploadModel.findOne({
-      hash,
-      user_id: userId,
-    });
-    let s3Key: string;
+    const existingUpload = await this.uploadModel.findOne({ hash, user_id: userId });
 
-    if (existingUpload) {
-      s3Key = existingUpload.s3Key;
-    } else {
-      s3Key = `${userId}/${randomBytes(8).toString('hex')}_${file.originalname}`;
+    if (existingUpload && existingUpload.status !== UploadStatus.FAILED) {
+      return { upload: existingUpload, isDuplicate: true };
+    }
+
+    const s3Key = existingUpload
+      ? existingUpload.s3Key
+      : `${userId}/${randomBytes(8).toString('hex')}_${file.originalname}`;
+
+    if (!existingUpload) {
       await this.awsService.uploadToS3({ file, key: s3Key });
     }
 
@@ -69,7 +70,7 @@ export class UploadService {
       ],
     });
 
-    return upload;
+    return { upload, isDuplicate: false };
   }
 
   async findAll(

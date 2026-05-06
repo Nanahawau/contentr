@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpStatus } from '@nestjs/common';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 import { Platform } from './enums/platform.enum';
@@ -31,13 +32,19 @@ const mockFile: Express.Multer.File = {
   path: '',
 };
 
-const mockUser = { id: 'user-id-123', email: 'user@example.com', verified: true };
+const mockUser = {
+  id: 'user-id-123',
+  email: 'user@example.com',
+  verified: true,
+};
 
 const mockUploadService = {
   create: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
 };
+
+const mockResponse = { status: jest.fn() };
 
 describe('UploadController', () => {
   let controller: UploadController;
@@ -56,17 +63,44 @@ describe('UploadController', () => {
   });
 
   describe('create', () => {
-    it('delegates to service.create with parsed platforms and user id', async () => {
-      mockUploadService.create.mockResolvedValue(mockUpload);
+    it('returns 201 and the upload when a new file is created', async () => {
+      mockUploadService.create.mockResolvedValue({
+        upload: mockUpload,
+        isDuplicate: false,
+      });
       const platforms = [Platform.TWITTER, Platform.LINKEDIN];
 
-      const result = await controller.create(mockFile, JSON.stringify(platforms), mockUser);
+      const result = await controller.create(
+        mockFile,
+        JSON.stringify(platforms),
+        mockUser,
+        mockResponse as never,
+      );
 
       expect(mockUploadService.create).toHaveBeenCalledWith({
         file: mockFile,
         platforms,
         userId: mockUser.id,
       });
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CREATED);
+      expect(result).toBe(mockUpload);
+    });
+
+    it('returns 200 and the existing upload when the file is a duplicate', async () => {
+      mockUploadService.create.mockResolvedValue({
+        upload: mockUpload,
+        isDuplicate: true,
+      });
+      const platforms = [Platform.TWITTER, Platform.LINKEDIN];
+
+      const result = await controller.create(
+        mockFile,
+        JSON.stringify(platforms),
+        mockUser,
+        mockResponse as never,
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(result).toBe(mockUpload);
     });
   });
@@ -78,7 +112,11 @@ describe('UploadController', () => {
 
       const result = await controller.findAll(mockUser, 20, undefined);
 
-      expect(mockUploadService.findAll).toHaveBeenCalledWith('user-id-123', 20, undefined);
+      expect(mockUploadService.findAll).toHaveBeenCalledWith(
+        'user-id-123',
+        20,
+        undefined,
+      );
       expect(result).toBe(page);
     });
 
@@ -88,7 +126,11 @@ describe('UploadController', () => {
 
       await controller.findAll(mockUser, 20, 'some-cursor-id');
 
-      expect(mockUploadService.findAll).toHaveBeenCalledWith('user-id-123', 20, 'some-cursor-id');
+      expect(mockUploadService.findAll).toHaveBeenCalledWith(
+        'user-id-123',
+        20,
+        'some-cursor-id',
+      );
     });
   });
 
@@ -98,7 +140,10 @@ describe('UploadController', () => {
 
       const result = await controller.findOne('upload-id-123', mockUser);
 
-      expect(mockUploadService.findOne).toHaveBeenCalledWith('upload-id-123', 'user-id-123');
+      expect(mockUploadService.findOne).toHaveBeenCalledWith(
+        'upload-id-123',
+        'user-id-123',
+      );
       expect(result).toBe(mockUpload);
     });
   });

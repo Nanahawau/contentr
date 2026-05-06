@@ -3,10 +3,12 @@ import {
   Body,
   Controller,
   Get,
+  HttpStatus,
   Inject,
   Param,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -15,6 +17,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ConfigType } from '@nestjs/config';
 import { UploadService } from './upload.service';
@@ -49,6 +52,7 @@ export class UploadController {
     file: Express.Multer.File,
     @Body('platforms') platformsJson: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) response: Response,
   ) {
     const maxBytes = this.config.maxUploadSizeMb * 1024 * 1024;
     if (file.size > maxBytes) {
@@ -58,7 +62,10 @@ export class UploadController {
     }
 
     const platforms = JSON.parse(platformsJson) as Platform[];
-    return this.uploadService.create({ file, platforms, userId: user.id });
+    const { upload, isDuplicate } = await this.uploadService.create({ file, platforms, userId: user.id });
+
+    response.status(isDuplicate ? HttpStatus.OK : HttpStatus.CREATED);
+    return upload;
   }
 
   @Get()
