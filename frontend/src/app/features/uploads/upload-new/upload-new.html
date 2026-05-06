@@ -17,7 +17,6 @@
         </div>
 
         @if (uploadState() === 'success') {
-          <!-- Success state -->
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -62,7 +61,7 @@
                 </svg>
               </div>
               <p class="text-stone-700 font-medium text-sm">Drag & drop your file here</p>
-              <p class="text-stone-400 text-xs mt-1">or click to browse · Audio, video, text, PDF · max 50 MB</p>
+              <p class="text-stone-400 text-xs mt-1">or click to browse · Audio, video, text, PDF · max {{ configService.maxUploadSizeMb() }}MB</p>
             }
           </div>
 
@@ -101,6 +100,35 @@
             </div>
           }
 
+          <!-- Warning modal -->
+          @if (uploadState() === 'warn') {
+            <div class="mb-4 px-4 py-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <div class="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div class="flex-1">
+                  <p class="text-amber-900 font-medium text-sm">Quality warning — score {{ qualityScore() }}/10</p>
+                  <p class="text-amber-800 text-sm mt-1">{{ warningMessage() }}</p>
+                  <div class="flex gap-2 mt-3">
+                    <button
+                      (click)="confirmUpload()"
+                      class="px-4 py-1.5 bg-amber-900 text-amber-100 rounded-lg text-sm font-medium hover:bg-amber-800 transition-colors"
+                    >
+                      Proceed anyway
+                    </button>
+                    <button
+                      (click)="cancelUpload()"
+                      class="px-4 py-1.5 bg-white border border-amber-300 text-amber-900 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+
           <!-- Upload progress -->
           @if (uploadState() === 'uploading') {
             <div class="mb-4">
@@ -120,10 +148,12 @@
           <!-- Submit -->
           <button
             (click)="submit()"
-            [disabled]="!canUpload || uploadState() === 'uploading'"
+            [disabled]="!canUpload || uploadState() === 'analysing' || uploadState() === 'uploading' || uploadState() === 'warn'"
             class="w-full py-3 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-stone-900 text-white hover:bg-stone-800"
           >
-            @if (uploadState() === 'uploading') {
+            @if (uploadState() === 'analysing') {
+              Checking file quality...
+            } @else if (uploadState() === 'uploading') {
               Uploading...
             } @else {
               Upload & generate content

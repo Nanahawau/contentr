@@ -30,6 +30,9 @@ export class Upload {
 
   @Prop({ type: String, enum: UploadStatus, default: UploadStatus.PENDING })
   status: UploadStatus;
+
+  @Prop({ required: true })
+  quality_score: number;
 }
 
 export const UploadSchema = SchemaFactory.createForClass(Upload);

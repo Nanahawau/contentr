@@ -1,9 +1,14 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectFlowProducer } from '@nestjs/bullmq';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { ConfigType } from '@nestjs/config';
 import { FlowProducer } from 'bullmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -14,25 +19,90 @@ import { CreateUploadDto } from './dto/create-upload.dto';
 import { generateFileHash } from '../common/helpers/helper-functions';
 import { UploadStatus } from './enums/upload-status.enum';
 import { JobName, QueueName } from 'src/common/constants/queue.constants';
+import { QualityCheckService, QualityResult } from './quality-check.service';
+import defaultConfig from 'src/config/default.config';
+
+type AnalysisRecord = {
+  hash: string;
+  score: number;
+  userId: string;
+};
+
+export type AnalyseResult = QualityResult & {
+  analysisToken?: string;
+};
 
 @Injectable()
 export class UploadService {
   constructor(
     @InjectFlowProducer() private readonly flowProducer: FlowProducer,
     private readonly awsService: AwsService,
+    private readonly qualityCheckService: QualityCheckService,
     @InjectModel(Upload.name) private readonly uploadModel: Model<Upload>,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    @Inject(defaultConfig.KEY)
+    private readonly config: ConfigType<typeof defaultConfig>,
   ) {}
 
-  async create(createUploadDto: CreateUploadDto): Promise<{ upload: UploadDocument; isDuplicate: boolean }> {
-    const { file, platforms, userId } = createUploadDto;
+  async analyse(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<AnalyseResult> {
+    const result = await this.qualityCheckService.check(file);
+
+    if (result.band === 'rejected') {
+      throw new UnprocessableEntityException({
+        score: result.score,
+        reason: result.reason,
+      });
+    }
+
+    const hash = generateFileHash(file);
+    const analysisToken = randomBytes(16).toString('hex');
+    const record: AnalysisRecord = { hash, score: result.score, userId };
+
+    await this.cacheManager.set(
+      `analysis:${analysisToken}`,
+      record,
+      this.config.analysisTokenTtlMs,
+    );
+
+    return { ...result, analysisToken };
+  }
+
+  async create(
+    createUploadDto: CreateUploadDto,
+  ): Promise<{ upload: UploadDocument; isDuplicate: boolean }> {
+    const { file, platforms, userId, analysisToken } = createUploadDto;
 
     if (!platforms.length) {
-      throw new BadRequestException('At least one platform must be selected');
+      throw new BadRequestException('At least one platform must be selected.');
+    }
+
+    const record = await this.cacheManager.get<AnalysisRecord>(
+      `analysis:${analysisToken}`,
+    );
+
+    if (!record) {
+      throw new BadRequestException(
+        'Invalid or expired analysis token. Please re-analyse the file.',
+      );
     }
 
     const hash = generateFileHash(file);
 
-    const existingUpload = await this.uploadModel.findOne({ hash, user_id: userId });
+    if (record.userId !== userId || record.hash !== hash) {
+      throw new BadRequestException(
+        'Analysis token does not match the uploaded file.',
+      );
+    }
+
+    await this.cacheManager.del(`analysis:${analysisToken}`);
+
+    const existingUpload = await this.uploadModel.findOne({
+      hash,
+      user_id: userId,
+    });
 
     if (existingUpload && existingUpload.status !== UploadStatus.FAILED) {
       return { upload: existingUpload, isDuplicate: true };
@@ -55,6 +125,7 @@ export class UploadService {
       file_size: file.size,
       platforms,
       status: UploadStatus.PENDING,
+      quality_score: record.score,
     });
 
     await this.flowProducer.add({
