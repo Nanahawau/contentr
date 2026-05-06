@@ -23,6 +23,7 @@ import { JwtAuthGuard } from './authentication/guard/jwt.guard';
 import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
 import { AwsModule } from './integrations/aws/aws.module';
+import { PublicConfigModule } from './config/public-config.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { AwsModule } from './integrations/aws/aws.module';
     NotificationModule,
     ContentModule,
     AwsModule,
+    PublicConfigModule,
   ],
   controllers: [AppController],
   providers: [

@@ -56,8 +56,6 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, Response<T>> {
 
     const message = exception.response? exception.response.message : exception.message;
 
-    console.log({exception})
-
     response.status(status).json({
       status: false,
       statusCode: status,

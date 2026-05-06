@@ -1,0 +1,119 @@
+<div class="flex h-screen bg-stone-50 overflow-hidden">
+  <app-sidebar />
+
+  <div class="flex-1 flex flex-col min-w-0">
+    <app-top-bar />
+
+    <main class="flex-1 overflow-y-auto p-8">
+      <div class="max-w-3xl mx-auto">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h1 class="text-stone-900 text-lg font-semibold">Uploads</h1>
+            @if (!isLoading()) {
+              <p class="text-stone-500 text-sm mt-0.5">{{ uploads().length }} {{ uploads().length === 1 ? 'file' : 'files' }} loaded</p>
+            }
+          </div>
+          <a
+            routerLink="/uploads/new"
+            class="flex items-center gap-2 px-4 py-2 bg-stone-900 text-white text-sm font-medium rounded-xl hover:bg-stone-800 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            New upload
+          </a>
+        </div>
+
+        @if (isLoading()) {
+          <!-- Skeleton -->
+          <div class="space-y-3">
+            @for (item of [1, 2, 3]; track item) {
+              <div class="h-20 bg-stone-200 rounded-2xl animate-pulse"></div>
+            }
+          </div>
+        } @else if (uploads().length === 0) {
+          <!-- Empty state -->
+          <div class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-12 h-12 rounded-xl bg-stone-200 flex items-center justify-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <p class="text-stone-700 font-medium text-sm">No uploads yet</p>
+            <p class="text-stone-400 text-xs mt-1 mb-5">Upload a file to generate platform-optimised content.</p>
+            <a routerLink="/uploads/new" class="px-4 py-2 bg-stone-900 text-white text-sm font-medium rounded-xl hover:bg-stone-800 transition-colors">
+              New upload
+            </a>
+          </div>
+        } @else {
+          <!-- Upload cards -->
+          <div class="space-y-3">
+            @for (upload of uploads(); track upload._id) {
+              <a
+                [routerLink]="['/uploads', upload._id]"
+                class="flex items-center gap-4 bg-white border border-stone-200 rounded-2xl px-5 py-4 hover:border-stone-300 hover:shadow-sm transition-all group"
+              >
+                <!-- Icon -->
+                <div class="w-9 h-9 rounded-lg bg-stone-100 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <p class="text-stone-900 text-sm font-medium truncate">{{ upload.original_name }}</p>
+                  <div class="flex items-center gap-2 mt-1 flex-wrap">
+                    <span class="text-stone-400 text-xs">{{ formatBytes(upload.file_size) }}</span>
+                    <span class="text-stone-300">·</span>
+                    <span class="text-stone-400 text-xs">{{ formatDate(upload.createdAt) }}</span>
+                    <span class="text-stone-300">·</span>
+                    <div class="flex gap-1 flex-wrap">
+                      @for (platform of upload.platforms; track platform) {
+                        <span class="px-1.5 py-0.5 bg-stone-100 text-stone-600 text-xs rounded-md">{{ platformLabels[platform] }}</span>
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Status badge -->
+                <div class="shrink-0 flex items-center gap-3">
+                  <span
+                    class="px-2.5 py-1 text-xs font-medium rounded-full"
+                    [class.bg-amber-100]="upload.status === 'pending'"
+                    [class.text-amber-800]="upload.status === 'pending'"
+                    [class.bg-blue-100]="upload.status === 'processing'"
+                    [class.text-blue-800]="upload.status === 'processing'"
+                    [class.bg-emerald-100]="upload.status === 'completed'"
+                    [class.text-emerald-800]="upload.status === 'completed'"
+                    [class.bg-red-100]="upload.status === 'failed'"
+                    [class.text-red-800]="upload.status === 'failed'"
+                  >
+                    {{ upload.status }}
+                  </span>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-stone-300 group-hover:text-stone-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </a>
+            }
+          </div>
+
+          <!-- Load more -->
+          @if (nextCursor()) {
+            <div class="mt-6 flex justify-center">
+              <button
+                (click)="loadMore()"
+                [disabled]="isLoadingMore()"
+                class="px-5 py-2.5 text-sm font-medium text-stone-700 border border-stone-200 rounded-xl hover:bg-stone-100 transition-colors disabled:opacity-50"
+              >
+                {{ isLoadingMore() ? 'Loading...' : 'Load more' }}
+              </button>
+            </div>
+          }
+        }
+      </div>
+    </main>
+  </div>
+</div>

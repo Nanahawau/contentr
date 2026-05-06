@@ -8,8 +8,9 @@ import { AwsService } from 'src/integrations/aws/aws.service';
 import { Upload } from 'src/upload/schemas/upload.schema';
 import { UploadJobResponse } from './consumers.type';
 import { Inject, Logger } from '@nestjs/common';
+import { QueueName } from 'src/common/constants/queue.constants';
 
-@Processor('uploadQueue')
+@Processor(QueueName.UPLOAD)
 export class UploadConsumer extends WorkerHost {
   private readonly logger = new Logger(UploadConsumer.name);
   constructor(
