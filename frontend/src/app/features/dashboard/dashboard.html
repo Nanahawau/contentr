@@ -39,9 +39,12 @@
           </p>
 
           <!-- Gradient upload prompt card — NeoMind amber gradient -->
-          <div class="w-full rounded-2xl p-px bg-gradient-to-br from-amber-700 via-amber-800 to-stone-950 shadow-xl">
+          <a
+            routerLink="/uploads/new"
+            class="block w-full rounded-2xl p-px bg-gradient-to-br from-amber-700 via-amber-800 to-stone-950 shadow-xl hover:shadow-2xl transition-shadow"
+          >
             <div class="w-full rounded-2xl bg-gradient-to-br from-amber-900/90 via-amber-950 to-stone-950 p-6">
-              <p class="text-amber-200/60 text-xs mb-4 text-left">Suggested</p>
+              <p class="text-amber-200/60 text-xs mb-4 text-left">Get started</p>
               <div class="flex gap-2 mb-4 flex-wrap">
                 <span class="px-3 py-1.5 bg-white/10 rounded-full text-xs text-amber-100 border border-white/10">
                   Upload a podcast episode
@@ -51,24 +54,15 @@
                 </span>
               </div>
               <div class="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3 border border-white/10">
-                <input
-                  type="text"
-                  placeholder="Upload a file or describe your content..."
-                  disabled
-                  class="flex-1 bg-transparent text-sm text-amber-100 placeholder-amber-300/40 outline-none cursor-not-allowed"
-                />
-                <button
-                  disabled
-                  class="w-8 h-8 rounded-lg bg-amber-500/30 flex items-center justify-center cursor-not-allowed"
-                >
+                <p class="flex-1 text-sm text-amber-300/60">Upload a file to generate platform-optimised content...</p>
+                <div class="w-8 h-8 rounded-lg bg-amber-500/40 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
                   </svg>
-                </button>
+                </div>
               </div>
-              <p class="text-amber-300/30 text-xs mt-3 text-center">Upload coming in the next milestone</p>
             </div>
-          </div>
+          </a>
 
           <!-- Credit balance hint -->
           <p class="text-stone-400 text-xs mt-6">

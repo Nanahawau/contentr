@@ -25,6 +25,21 @@ export const routes: Routes = [
     loadComponent: () => import('./features/dashboard/dashboard').then((module) => module.Dashboard),
   },
   {
+    path: 'uploads',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/uploads/upload-list/upload-list').then((module) => module.UploadList),
+  },
+  {
+    path: 'uploads/new',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/uploads/upload-new/upload-new').then((module) => module.UploadNew),
+  },
+  {
+    path: 'uploads/:id',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/uploads/upload-detail/upload-detail').then((module) => module.UploadDetail),
+  },
+  {
     path: '**',
     redirectTo: 'dashboard',
   },

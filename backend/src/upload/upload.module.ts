@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UploadService } from './upload.service';
 import { UploadController } from './upload.controller';
-import { ConsumersModule } from 'src/consumers/consumers.module';
 import { ConfigModule, ConfigType } from '@nestjs/config';
 import defaultConfig from 'src/config/default.config';
 import { BullModule } from '@nestjs/bullmq';

@@ -15,6 +15,10 @@ export type TranscriptionJobResponse = {
   uploadId: string,
 }
 
+import { Platform } from 'src/upload/enums/platform.enum';
+
 export type LlmJobData = {
-  platforms: string[]
-}
+  platforms: Platform[];
+  userId: string;
+  uploadId: string;
+};

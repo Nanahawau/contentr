@@ -1,6 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectModel } from '@nestjs/mongoose';
-import { Job, Queue } from 'bullmq';
+import { Job } from 'bullmq';
 import { Model } from 'mongoose';
 import { Transcription } from 'src/transcription/schemas/transcription.schema';
 import { TranscriptionService } from 'src/transcription/transcription.service';
@@ -9,12 +9,12 @@ import {
   TranscriptionJobResponse,
 } from './consumers.type';
 import { Logger } from '@nestjs/common';
-import { getQueueName } from 'src/common/helpers/helper-functions';
+import { QueueName } from 'src/common/constants/queue.constants';
 import { AwsService } from 'src/integrations/aws/aws.service';
 import { Upload } from 'src/upload/schemas/upload.schema';
 import { Readable } from 'stream';
 
-@Processor('transcriptionQueue')
+@Processor(QueueName.TRANSCRIPTION)
 export class TranscriptionConsumer extends WorkerHost {
   private readonly logger = new Logger(TranscriptionConsumer.name);
   constructor(
@@ -38,8 +38,6 @@ export class TranscriptionConsumer extends WorkerHost {
       let transcription;
       const { uploadId, userId } = job.data;
       const uploadedFile = await this.uploadModel.findOne({ _id: uploadId });
-
-      console.log({ uploadedFile });
 
       if (!uploadedFile) {
         throw new Error('An error occurred in transcription queue');
