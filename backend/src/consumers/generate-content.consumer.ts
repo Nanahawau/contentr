@@ -7,7 +7,7 @@ import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { Logger } from '@nestjs/common';
 import { QueueName } from 'src/common/constants/queue.constants';
-import { Platform } from 'src/upload/enums/platform.enum';
+import { Platform } from 'src/common/enums/platform.enum';
 
 type GenerateContentResult = { success: boolean; platformsProcessed: number };
 

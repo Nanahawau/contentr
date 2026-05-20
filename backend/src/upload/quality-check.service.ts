@@ -17,6 +17,8 @@ export type QualityResult = {
   score: number;
   band: QualityBand;
   reason: string;
+  durationSeconds: number;
+  wordCount: number;
 };
 
 type FfprobeStream = {
@@ -188,6 +190,8 @@ export class QualityCheckService {
         score: 1,
         band: 'rejected',
         reason: 'File is corrupt or cannot be read.',
+        durationSeconds: 0,
+        wordCount: 0,
       };
     } finally {
       await unlink(tempPath).catch(() => {});
@@ -205,6 +209,8 @@ export class QualityCheckService {
         score: 1,
         band: 'rejected',
         reason: 'No audio or video stream found in file.',
+        durationSeconds: 0,
+        wordCount: 0,
       };
     }
 
@@ -221,6 +227,8 @@ export class QualityCheckService {
         score: baseScore,
         band: this.toBand(baseScore),
         reason: baseReason,
+        durationSeconds: duration,
+        wordCount: 0,
       };
     }
 
@@ -237,7 +245,7 @@ export class QualityCheckService {
       VIDEO_MODIFIER_RULES,
     );
 
-    return { score, band: this.toBand(score), reason };
+    return { score, band: this.toBand(score), reason, durationSeconds: duration, wordCount: 0 };
   }
 
   private async checkPdf(file: Express.Multer.File): Promise<QualityResult> {
@@ -249,6 +257,8 @@ export class QualityCheckService {
         score: 2,
         band: 'rejected',
         reason: 'PDF could not be read or is corrupt.',
+        durationSeconds: 0,
+        wordCount: 0,
       };
     }
   }
@@ -260,18 +270,21 @@ export class QualityCheckService {
         score: 2,
         band: 'rejected',
         reason: 'File contains encoding errors and cannot be read.',
+        durationSeconds: 0,
+        wordCount: 0,
       };
     }
     return this.scoreByWordCount(text);
   }
 
   private scoreByWordCount(text: string): QualityResult {
-    const wordCount = text
+    const words = text
       .trim()
       .split(/\s+/)
-      .filter((word) => word.length > 0).length;
+      .filter((word) => word.length > 0);
+    const wordCount = words.length;
     const { score, reason } = applyRules(wordCount, WORD_COUNT_RULES);
-    return { score, band: this.toBand(score), reason };
+    return { score, band: this.toBand(score), reason, durationSeconds: 0, wordCount };
   }
 
   private toBand(score: number): QualityBand {

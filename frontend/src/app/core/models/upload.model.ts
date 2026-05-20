@@ -1,16 +1,38 @@
-export type UploadStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export enum UploadStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
 
-export type Platform = 'twitter' | 'linkedin' | 'instagram' | 'tiktok' | 'youtube_shorts';
+export enum Platform {
+  TWITTER = 'twitter',
+  LINKEDIN = 'linkedin',
+  INSTAGRAM = 'instagram',
+  TIKTOK = 'tiktok',
+  YOUTUBE_SHORTS = 'youtube_shorts',
+}
+
+export enum QualityBand {
+  PASS = 'pass',
+  WARN = 'warn',
+}
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
-  twitter: 'Twitter / X',
-  linkedin: 'LinkedIn',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube_shorts: 'YouTube Shorts',
+  [Platform.TWITTER]: 'Twitter / X',
+  [Platform.LINKEDIN]: 'LinkedIn',
+  [Platform.INSTAGRAM]: 'Instagram',
+  [Platform.TIKTOK]: 'TikTok',
+  [Platform.YOUTUBE_SHORTS]: 'YouTube Shorts',
 };
 
-export const ALL_PLATFORMS: Platform[] = ['twitter', 'linkedin', 'instagram', 'tiktok', 'youtube_shorts'];
+export const ALL_PLATFORMS: Platform[] = [
+  Platform.TWITTER,
+  Platform.LINKEDIN,
+  Platform.INSTAGRAM,
+  Platform.TIKTOK,
+  Platform.YOUTUBE_SHORTS,
+];
 
 export interface Upload {
   _id: string;
@@ -32,11 +54,17 @@ export interface UploadsPage {
   nextCursor: string | null;
 }
 
-export type QualityBand = 'pass' | 'warn';
+export interface CreditEstimate {
+  transcriptionCost: number;
+  storageCost: number;
+  generationCost: number;
+  total: number;
+}
 
 export interface AnalyseResult {
   score: number;
   band: QualityBand;
   reason: string;
   analysisToken: string;
+  creditEstimate: CreditEstimate;
 }

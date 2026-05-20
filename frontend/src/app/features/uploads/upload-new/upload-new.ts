@@ -1,13 +1,14 @@
-import { Component, inject, signal, ElementRef, viewChild } from '@angular/core';
+import { Component, inject, signal, computed, ElementRef, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { HttpEventType, HttpResponse } from '@angular/common/http';
 import { UploadService } from '../../../core/services/upload.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { ConfigService } from '../../../core/services/config.service';
-import { ALL_PLATFORMS, Platform, PLATFORM_LABELS, Upload } from '../../../core/models/upload.model';
+import { ALL_PLATFORMS, CreditEstimate, Platform, PLATFORM_LABELS, QualityBand, Upload, UploadStatus } from '../../../core/models/upload.model';
+import { formatBytes } from '../../../core/utils/format.utils';
 import { Sidebar } from '../../../shared/components/sidebar/sidebar';
 import { TopBar } from '../../../shared/components/top-bar/top-bar';
 
-type UploadState = 'idle' | 'analysing' | 'warn' | 'uploading' | 'success' | 'error';
+type UploadState = 'idle' | 'analysing' | 'confirming' | 'submitting' | 'success' | 'error';
 
 @Component({
   selector: 'app-upload-new',
@@ -16,6 +17,7 @@ type UploadState = 'idle' | 'analysing' | 'warn' | 'uploading' | 'success' | 'er
 })
 export class UploadNew {
   private readonly uploadService = inject(UploadService);
+  protected readonly authService = inject(AuthService);
   protected readonly configService = inject(ConfigService);
   private readonly router = inject(Router);
 
@@ -25,17 +27,25 @@ export class UploadNew {
   protected readonly selectedPlatforms = signal<Set<Platform>>(new Set());
   protected readonly isDragging = signal(false);
   protected readonly uploadState = signal<UploadState>('idle');
-  protected readonly progress = signal(0);
   protected readonly errorMessage = signal('');
-  protected readonly warningMessage = signal('');
   protected readonly qualityScore = signal(0);
+  protected readonly qualityBand = signal<QualityBand>(QualityBand.PASS);
+  protected readonly warningMessage = signal('');
+  protected readonly creditEstimate = signal<CreditEstimate | null>(null);
+
+  protected readonly balanceAfter = computed(() => {
+    const balance = this.authService.currentUser()?.credits.balance ?? 0;
+    const cost = this.creditEstimate()?.total ?? 0;
+    return balance - cost;
+  });
 
   private pendingAnalysisToken = '';
 
   protected readonly allPlatforms = ALL_PLATFORMS;
   protected readonly platformLabels = PLATFORM_LABELS;
+  protected readonly QualityBand = QualityBand;
 
-  protected get canUpload(): boolean {
+  protected get canSubmit(): boolean {
     return this.selectedFile() !== null && this.selectedPlatforms().size > 0;
   }
 
@@ -81,20 +91,19 @@ export class UploadNew {
 
   protected submit(): void {
     const file = this.selectedFile();
-    if (!file || !this.canUpload) return;
+    if (!file || !this.canSubmit) return;
 
     this.uploadState.set('analysing');
+    const platforms = Array.from(this.selectedPlatforms());
 
-    this.uploadService.analyse(file).subscribe({
+    this.uploadService.analyse(file, platforms).subscribe({
       next: (result) => {
-        if (result.band === 'warn') {
-          this.pendingAnalysisToken = result.analysisToken;
-          this.qualityScore.set(result.score);
-          this.warningMessage.set(result.reason);
-          this.uploadState.set('warn');
-        } else {
-          this.proceedWithUpload(file, result.analysisToken);
-        }
+        this.pendingAnalysisToken = result.analysisToken;
+        this.qualityScore.set(result.score);
+        this.qualityBand.set(result.band);
+        this.warningMessage.set(result.reason);
+        this.creditEstimate.set(result.creditEstimate);
+        this.uploadState.set('confirming');
       },
       error: (error) => {
         const reason = error.error?.reason ?? 'File did not pass quality check. Please try a different file.';
@@ -105,43 +114,30 @@ export class UploadNew {
   }
 
   protected confirmUpload(): void {
-    const file = this.selectedFile();
-    if (!file || !this.pendingAnalysisToken) return;
-    this.proceedWithUpload(file, this.pendingAnalysisToken);
+    if (!this.pendingAnalysisToken) return;
+    this.uploadState.set('submitting');
+
+    this.uploadService.confirm(this.pendingAnalysisToken).subscribe({
+      next: (upload: Upload) => {
+        this.uploadState.set('success');
+        this.authService.fetchMe().subscribe();
+        setTimeout(() => this.router.navigate(['/uploads', upload._id]), 1500);
+      },
+      error: (error) => {
+        this.uploadState.set('error');
+        const message = error.error?.message ?? 'Upload failed. Please try again.';
+        this.errorMessage.set(message);
+      },
+    });
   }
 
   protected cancelUpload(): void {
     this.pendingAnalysisToken = '';
+    this.creditEstimate.set(null);
     this.uploadState.set('idle');
   }
 
-  protected formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  private proceedWithUpload(file: File, analysisToken: string): void {
-    const platforms = Array.from(this.selectedPlatforms());
-    this.uploadState.set('uploading');
-    this.progress.set(0);
-
-    this.uploadService.upload(file, platforms, analysisToken).subscribe({
-      next: (event) => {
-        if (event.type === HttpEventType.UploadProgress && event.total) {
-          this.progress.set(Math.round((100 * event.loaded) / event.total));
-        } else if (event instanceof HttpResponse) {
-          this.uploadState.set('success');
-          const upload = event.body as Upload;
-          setTimeout(() => this.router.navigate(['/uploads', upload._id]), 1500);
-        }
-      },
-      error: () => {
-        this.uploadState.set('error');
-        this.errorMessage.set('Upload failed. Please check your file and try again.');
-      },
-    });
-  }
+  protected readonly formatBytes = formatBytes;
 
   private setFile(file: File): void {
     const maxBytes = this.configService.maxUploadSizeMb() * 1024 * 1024;

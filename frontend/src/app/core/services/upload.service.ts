@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient, HttpEvent } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AnalyseResult, Platform, Upload, UploadsPage } from '../models/upload.model';
@@ -9,22 +9,15 @@ export class UploadService {
   private readonly httpClient = inject(HttpClient);
   private readonly baseUrl = `${environment.apiUrl}/uploads`;
 
-  analyse(file: File): Observable<AnalyseResult> {
-    const formData = new FormData();
-    formData.append('file', file);
-    return this.httpClient.post<AnalyseResult>(`${this.baseUrl}/analyse`, formData);
-  }
-
-  upload(file: File, platforms: Platform[], analysisToken: string): Observable<HttpEvent<Upload>> {
+  analyse(file: File, platforms: Platform[]): Observable<AnalyseResult> {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('platforms', JSON.stringify(platforms));
-    formData.append('analysisToken', analysisToken);
+    return this.httpClient.post<AnalyseResult>(`${this.baseUrl}/analyse`, formData);
+  }
 
-    return this.httpClient.post<Upload>(this.baseUrl, formData, {
-      reportProgress: true,
-      observe: 'events',
-    });
+  confirm(analysisToken: string): Observable<Upload> {
+    return this.httpClient.post<Upload>(`${this.baseUrl}/confirm`, { analysisToken });
   }
 
   findAll(limit = 20, cursor?: string): Observable<UploadsPage> {

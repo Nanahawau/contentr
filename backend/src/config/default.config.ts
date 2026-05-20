@@ -12,7 +12,7 @@ export default registerAs('defaultConfig', () => ({
   redisHost: process.env.REDIS_HOST || 'localhost',
   redisPort: parseInt(process.env.REDIS_PORT || '') || 6379,
   removeOnCompleteValue:
-    process.env.REMOVE_ON_COMPLETE_VALUE === 'true' || true,
+    process.env.REMOVE_ON_COMPLETE_VALUE !== 'false',
   removeOnFailCount: parseInt(process.env.REMOVE_ON_FAIL_COUNT || '') || 2,
   flowProducerName: process.env.FLOW_PRODUCER_NAME || 'contentrFlowProducer',
   backOffType: process.env.BACKOFF_TYPE || 'exponential',
@@ -21,4 +21,11 @@ export default registerAs('defaultConfig', () => ({
   freeCreditsOnSignup: parseInt(process.env.FREE_CREDITS_ON_SIGNUP || '') || 500,
   maxUploadSizeMb: parseInt(process.env.MAX_UPLOAD_SIZE_MB || '') || 100,
   analysisTokenTtlMs: parseInt(process.env.ANALYSIS_TOKEN_TTL_MS || '') || 900000,
+  creditRates: {
+    transcriptionPerMinute: parseInt(process.env.CREDIT_RATE_TRANSCRIPTION_PER_MIN || '') || 10,
+    storagePerHundredMb: parseInt(process.env.CREDIT_RATE_STORAGE_PER_100MB || '') || 1,
+    textPer1kWords: parseInt(process.env.CREDIT_RATE_TEXT_PER_1K_WORDS || '') || 5,
+    captionGenerationTiers: [5, 8, 12, 18] as [number, number, number, number],
+    scriptGenerationTiers: [10, 15, 20, 30] as [number, number, number, number],
+  },
 }));

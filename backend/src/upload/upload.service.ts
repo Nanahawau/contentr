@@ -11,25 +11,35 @@ import { Cache } from 'cache-manager';
 import { ConfigType } from '@nestjs/config';
 import { FlowProducer } from 'bullmq';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { AwsService } from 'src/integrations/aws/aws.service';
 import { Upload, UploadDocument } from './schemas/upload.schema';
-import { CreateUploadDto } from './dto/create-upload.dto';
 import { generateFileHash } from '../common/helpers/helper-functions';
 import { UploadStatus } from './enums/upload-status.enum';
 import { JobName, QueueName } from 'src/common/constants/queue.constants';
 import { QualityCheckService, QualityResult } from './quality-check.service';
+import { CreditService, CreditEstimate } from '../credits/credit.service';
+import { Platform } from 'src/common/enums/platform.enum';
 import defaultConfig from 'src/config/default.config';
 
 type AnalysisRecord = {
   hash: string;
   score: number;
   userId: string;
+  durationSeconds: number;
+  wordCount: number;
+  platforms: Platform[];
+  creditEstimate: CreditEstimate;
+  s3Key: string;
+  fileSize: number;
+  mimetype: string;
+  originalname: string;
 };
 
 export type AnalyseResult = QualityResult & {
-  analysisToken?: string;
+  analysisToken: string;
+  creditEstimate: CreditEstimate;
 };
 
 @Injectable()
@@ -38,16 +48,28 @@ export class UploadService {
     @InjectFlowProducer() private readonly flowProducer: FlowProducer,
     private readonly awsService: AwsService,
     private readonly qualityCheckService: QualityCheckService,
+    private readonly creditService: CreditService,
     @InjectModel(Upload.name) private readonly uploadModel: Model<Upload>,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Inject(defaultConfig.KEY)
     private readonly config: ConfigType<typeof defaultConfig>,
   ) {}
 
+  validateFileSize(file: Express.Multer.File): void {
+    const maxBytes = this.config.maxUploadSizeMb * 1024 * 1024;
+    if (file.size > maxBytes) {
+      throw new BadRequestException(
+        `File too large. Maximum size is ${this.config.maxUploadSizeMb}MB.`,
+      );
+    }
+  }
+
   async analyse(
     file: Express.Multer.File,
     userId: string,
+    platforms: Platform[],
   ): Promise<AnalyseResult> {
+    this.validateFileSize(file);
     const result = await this.qualityCheckService.check(file);
 
     if (result.band === 'rejected') {
@@ -57,9 +79,33 @@ export class UploadService {
       });
     }
 
-    const hash = generateFileHash(file);
     const analysisToken = randomBytes(16).toString('hex');
-    const record: AnalysisRecord = { hash, score: result.score, userId };
+    const s3Key = `${userId}/${analysisToken}_${file.originalname}`;
+
+    await this.awsService.uploadToS3({ file, key: s3Key, tags: { lifecycle: 'pending' } });
+
+    const fileSizeMb = file.size / (1024 * 1024);
+    const creditEstimate = await this.creditService.estimateCost(
+      result.durationSeconds,
+      result.wordCount,
+      fileSizeMb,
+      platforms,
+    );
+
+    const hash = generateFileHash(file);
+    const record: AnalysisRecord = {
+      hash,
+      score: result.score,
+      userId,
+      durationSeconds: result.durationSeconds,
+      wordCount: result.wordCount,
+      platforms,
+      creditEstimate,
+      s3Key,
+      fileSize: file.size,
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+    };
 
     await this.cacheManager.set(
       `analysis:${analysisToken}`,
@@ -67,18 +113,13 @@ export class UploadService {
       this.config.analysisTokenTtlMs,
     );
 
-    return { ...result, analysisToken };
+    return { ...result, analysisToken, creditEstimate };
   }
 
-  async create(
-    createUploadDto: CreateUploadDto,
+  async confirm(
+    analysisToken: string,
+    userId: string,
   ): Promise<{ upload: UploadDocument; isDuplicate: boolean }> {
-    const { file, platforms, userId, analysisToken } = createUploadDto;
-
-    if (!platforms.length) {
-      throw new BadRequestException('At least one platform must be selected.');
-    }
-
     const record = await this.cacheManager.get<AnalysisRecord>(
       `analysis:${analysisToken}`,
     );
@@ -89,18 +130,16 @@ export class UploadService {
       );
     }
 
-    const hash = generateFileHash(file);
-
-    if (record.userId !== userId || record.hash !== hash) {
+    if (record.userId !== userId) {
       throw new BadRequestException(
-        'Analysis token does not match the uploaded file.',
+        'Analysis token does not match the requesting user.',
       );
     }
 
     await this.cacheManager.del(`analysis:${analysisToken}`);
 
     const existingUpload = await this.uploadModel.findOne({
-      hash,
+      hash: record.hash,
       user_id: userId,
     });
 
@@ -108,40 +147,53 @@ export class UploadService {
       return { upload: existingUpload, isDuplicate: true };
     }
 
-    const s3Key = existingUpload
-      ? existingUpload.s3Key
-      : `${userId}/${randomBytes(8).toString('hex')}_${file.originalname}`;
+    const s3Key = existingUpload ? existingUpload.s3Key : record.s3Key;
+    const uploadId = new Types.ObjectId();
+    const creditsToReserve = record.creditEstimate.total;
 
-    if (!existingUpload) {
-      await this.awsService.uploadToS3({ file, key: s3Key });
-    }
+    await this.creditService.reserve(userId, uploadId.toString(), creditsToReserve);
 
-    const upload = await this.uploadModel.create({
-      user_id: userId,
-      hash,
-      s3Key,
-      original_name: file.originalname,
-      mime_type: file.mimetype,
-      file_size: file.size,
-      platforms,
-      status: UploadStatus.PENDING,
-      quality_score: record.score,
-    });
+    try {
+      if (!existingUpload) {
+        await this.awsService.untagObject(record.s3Key);
+      }
 
-    await this.flowProducer.add({
-      name: JobName.GENERATE_CONTENT,
-      queueName: QueueName.GENERATE_CONTENT,
-      data: { platforms, userId, uploadId: upload.id as string },
-      children: [
-        {
-          name: JobName.TRANSCRIBE,
-          queueName: QueueName.TRANSCRIPTION,
-          data: { uploadId: upload.id as string, userId },
+      const upload = await this.uploadModel.create({
+        _id: uploadId,
+        user_id: userId,
+        hash: record.hash,
+        s3Key,
+        original_name: record.originalname,
+        mime_type: record.mimetype,
+        file_size: record.fileSize,
+        platforms: record.platforms,
+        status: UploadStatus.PENDING,
+        quality_score: record.score,
+        metadata: {
+          duration_seconds: record.durationSeconds,
+          word_count: record.wordCount,
         },
-      ],
-    });
+        credits_reserved: creditsToReserve,
+      });
 
-    return { upload, isDuplicate: false };
+      await this.flowProducer.add({
+        name: JobName.GENERATE_CONTENT,
+        queueName: QueueName.GENERATE_CONTENT,
+        data: { platforms: record.platforms, userId, uploadId: upload.id as string },
+        children: [
+          {
+            name: JobName.TRANSCRIBE,
+            queueName: QueueName.TRANSCRIPTION,
+            data: { uploadId: upload.id as string, userId },
+          },
+        ],
+      });
+
+      return { upload, isDuplicate: false };
+    } catch (error) {
+      await this.creditService.release(userId, uploadId.toString(), creditsToReserve);
+      throw error;
+    }
   }
 
   async findAll(

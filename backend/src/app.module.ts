@@ -24,6 +24,7 @@ import { SocialsOauthGuard } from './authentication/guard/socials-oauth.guard';
 import { GlobalAuthGuard } from './authentication/guard/globalauth.guard';
 import { AwsModule } from './integrations/aws/aws.module';
 import { PublicConfigModule } from './config/public-config.module';
+import { CreditModule } from './credits/credit.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { PublicConfigModule } from './config/public-config.module';
     ContentModule,
     AwsModule,
     PublicConfigModule,
+    CreditModule,
   ],
   controllers: [AppController],
   providers: [

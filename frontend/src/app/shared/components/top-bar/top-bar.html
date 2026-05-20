@@ -16,13 +16,19 @@
     @if (authService.currentUser(); as currentUser) {
       <div class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
         <div class="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-        <span class="text-xs font-semibold text-amber-900">{{ currentUser.credits.balance }} credits</span>
+        @if (currentUser.credits.reserved > 0) {
+          <span class="text-xs font-semibold text-amber-900">
+            {{ currentUser.credits.balance }} available · {{ currentUser.credits.reserved }} reserved
+          </span>
+        } @else {
+          <span class="text-xs font-semibold text-amber-900">{{ currentUser.credits.balance }} credits</span>
+        }
       </div>
 
       @if (currentUser.credits.balance < 100) {
-        <button class="text-xs font-medium text-white bg-stone-900 px-3 py-1.5 rounded-md hover:bg-stone-700 transition-colors">
+        <a routerLink="/credits/history" class="text-xs font-medium text-white bg-stone-900 px-3 py-1.5 rounded-md hover:bg-stone-700 transition-colors">
           Buy credits
-        </button>
+        </a>
       }
     }
   </div>
