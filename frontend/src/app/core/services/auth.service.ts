@@ -53,6 +53,12 @@ export class AuthService {
       .subscribe({ complete: () => this.clearSession() });
   }
 
+  fetchMe(): Observable<User> {
+    return this.httpClient
+      .get<User>(`${environment.apiUrl}/users/me`)
+      .pipe(tap((user) => this.currentUser.set(user)));
+  }
+
   clearSession(): void {
     this.accessTokenSignal.set(null);
     this.currentUser.set(null);

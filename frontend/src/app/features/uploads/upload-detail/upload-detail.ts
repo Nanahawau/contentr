@@ -1,7 +1,8 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { UploadService } from '../../../core/services/upload.service';
-import { PLATFORM_LABELS, Upload } from '../../../core/models/upload.model';
+import { PLATFORM_LABELS, Upload, UploadStatus } from '../../../core/models/upload.model';
+import { formatBytes, formatDate } from '../../../core/utils/format.utils';
 import { Sidebar } from '../../../shared/components/sidebar/sidebar';
 import { TopBar } from '../../../shared/components/top-bar/top-bar';
 
@@ -18,6 +19,9 @@ export class UploadDetail implements OnInit {
   protected readonly isLoading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly platformLabels = PLATFORM_LABELS;
+  protected readonly UploadStatus = UploadStatus;
+  protected readonly formatBytes = formatBytes;
+  protected readonly formatDate = formatDate;
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -36,21 +40,6 @@ export class UploadDetail implements OnInit {
         this.notFound.set(true);
         this.isLoading.set(false);
       },
-    });
-  }
-
-  protected formatBytes(bytes: number): string {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  protected formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   }
 }

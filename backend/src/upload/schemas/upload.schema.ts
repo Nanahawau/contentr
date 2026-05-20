@@ -1,9 +1,18 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
-import { Platform } from '../enums/platform.enum';
+import { Platform } from 'src/common/enums/platform.enum';
 import { UploadStatus } from '../enums/upload-status.enum';
 
 export type UploadDocument = HydratedDocument<Upload>;
+
+@Schema({ _id: false })
+class UploadMetadata {
+  @Prop({ default: 0 })
+  duration_seconds: number;
+
+  @Prop({ default: 0 })
+  word_count: number;
+}
 
 @Schema({ timestamps: true })
 export class Upload {
@@ -33,6 +42,12 @@ export class Upload {
 
   @Prop({ required: true })
   quality_score: number;
+
+  @Prop({ type: UploadMetadata, default: () => ({}) })
+  metadata: UploadMetadata;
+
+  @Prop({ default: 0 })
+  credits_reserved: number;
 }
 
 export const UploadSchema = SchemaFactory.createForClass(Upload);

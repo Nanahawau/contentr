@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  DeleteObjectTaggingCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -27,10 +28,13 @@ export class AwsService {
     });
   }
 
-  async uploadToS3(data: { file: Express.Multer.File; key: string }) {
+  async uploadToS3(data: {
+    file: Express.Multer.File;
+    key: string;
+    tags?: Record<string, string>;
+  }) {
     try {
-      const { file, key } = data;
-      // upload file
+      const { file, key, tags } = data;
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: key,
@@ -40,6 +44,11 @@ export class AwsService {
         Metadata: {
           originalName: String(file.originalname ?? '').trim(),
         },
+        Tagging: tags
+          ? Object.entries(tags)
+              .map(([k, v]) => `${k}=${v}`)
+              .join('&')
+          : undefined,
       });
 
       // TODO: check what is in upload response and build response body
@@ -58,6 +67,12 @@ export class AwsService {
         request_id: null,
       };
     }
+  }
+
+  async untagObject(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectTaggingCommand({ Bucket: this.bucketName, Key: key }),
+    );
   }
 
   async fetchFromS3(key: string): Promise<Buffer> {

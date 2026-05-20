@@ -9,17 +9,19 @@ import { AwsModule } from 'src/integrations/aws/aws.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Upload, UploadSchema } from './schemas/upload.schema';
 import { QualityCheckService } from './quality-check.service';
+import { CreditModule } from '../credits/credit.module';
 import KeyvRedis from '@keyv/redis';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Upload.name, schema: UploadSchema }]),
     AwsModule,
+    CreditModule,
     ConfigModule.forFeature(defaultConfig),
     BullModule.registerFlowProducerAsync({
       imports: [ConfigModule],
       inject: [defaultConfig.KEY],
-      useFactory: async (configService: ConfigType<typeof defaultConfig>) => ({
+      useFactory: (configService: ConfigType<typeof defaultConfig>) => ({
         name: configService.flowProducerName,
       }),
     }),
@@ -27,7 +29,11 @@ import KeyvRedis from '@keyv/redis';
       imports: [ConfigModule],
       inject: [defaultConfig.KEY],
       useFactory: (configService: ConfigType<typeof defaultConfig>) => ({
-        stores: [new KeyvRedis(`redis://${configService.redisHost}:${configService.redisPort}`)],
+        stores: [
+          new KeyvRedis(
+            `redis://${configService.redisHost}:${configService.redisPort}`,
+          ),
+        ],
       }),
     }),
   ],

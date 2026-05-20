@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { UploadService } from '../../../core/services/upload.service';
 import { PLATFORM_LABELS, Upload } from '../../../core/models/upload.model';
+import { formatBytes, formatDateShort } from '../../../core/utils/format.utils';
 import { Sidebar } from '../../../shared/components/sidebar/sidebar';
 import { TopBar } from '../../../shared/components/top-bar/top-bar';
 
@@ -18,6 +19,8 @@ export class UploadList implements OnInit {
   protected readonly isLoading = signal(true);
   protected readonly isLoadingMore = signal(false);
   protected readonly platformLabels = PLATFORM_LABELS;
+  protected readonly formatBytes = formatBytes;
+  protected readonly formatDate = formatDateShort;
 
   ngOnInit(): void {
     this.uploadService.findAll().subscribe({
@@ -43,14 +46,5 @@ export class UploadList implements OnInit {
       },
       error: () => this.isLoadingMore.set(false),
     });
-  }
-
-  protected formatBytes(bytes: number): string {
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  protected formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 }

@@ -40,6 +40,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/uploads/upload-detail/upload-detail').then((module) => module.UploadDetail),
   },
   {
+    path: 'credits/history',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/credits/credit-history/credit-history').then((module) => module.CreditHistory),
+  },
+  {
     path: '**',
     redirectTo: 'dashboard',
   },

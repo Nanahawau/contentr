@@ -23,7 +23,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p class="text-stone-900 font-medium">Upload successful</p>
+            <p class="text-stone-900 font-medium">Upload confirmed</p>
             <p class="text-stone-500 text-sm mt-1">Redirecting to your upload...</p>
           </div>
         } @else {
@@ -93,54 +93,86 @@
             </div>
           </div>
 
-          <!-- Error message -->
+          <!-- Error -->
           @if (uploadState() === 'error') {
             <div class="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
               {{ errorMessage() }}
             </div>
           }
 
-          <!-- Warning modal -->
-          @if (uploadState() === 'warn') {
-            <div class="mb-4 px-4 py-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <div class="flex items-start gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div class="flex-1">
-                  <p class="text-amber-900 font-medium text-sm">Quality warning — score {{ qualityScore() }}/10</p>
-                  <p class="text-amber-800 text-sm mt-1">{{ warningMessage() }}</p>
-                  <div class="flex gap-2 mt-3">
-                    <button
-                      (click)="confirmUpload()"
-                      class="px-4 py-1.5 bg-amber-900 text-amber-100 rounded-lg text-sm font-medium hover:bg-amber-800 transition-colors"
-                    >
-                      Proceed anyway
-                    </button>
-                    <button
-                      (click)="cancelUpload()"
-                      class="px-4 py-1.5 bg-white border border-amber-300 text-amber-900 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
-                    >
-                      Cancel
-                    </button>
+          <!-- Credit estimate + confirmation -->
+          @if (uploadState() === 'confirming' && creditEstimate(); as estimate) {
+            <div class="mb-4 rounded-2xl border border-stone-200 overflow-hidden">
+
+              <!-- Quality warning banner (only shown when band is warn) -->
+              @if (qualityBand() === QualityBand.WARN) {
+                <div class="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-start gap-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p class="text-amber-900 font-medium text-sm">Quality warning — score {{ qualityScore() }}/10</p>
+                    <p class="text-amber-800 text-sm mt-0.5">{{ warningMessage() }}</p>
                   </div>
                 </div>
-              </div>
-            </div>
-          }
+              }
 
-          <!-- Upload progress -->
-          @if (uploadState() === 'uploading') {
-            <div class="mb-4">
-              <div class="flex justify-between text-xs text-stone-500 mb-1.5">
-                <span>Uploading...</span>
-                <span>{{ progress() }}%</span>
+              <!-- Cost breakdown -->
+              <div class="px-4 pt-4 pb-3">
+                <p class="text-stone-700 text-sm font-medium mb-3">Estimated cost</p>
+                <div class="space-y-2">
+                  @if (estimate.transcriptionCost > 0) {
+                    <div class="flex justify-between text-sm">
+                      <span class="text-stone-500">Transcription</span>
+                      <span class="text-stone-700">{{ estimate.transcriptionCost }} credits</span>
+                    </div>
+                  }
+                  <div class="flex justify-between text-sm">
+                    <span class="text-stone-500">Storage</span>
+                    <span class="text-stone-700">{{ estimate.storageCost }} credits</span>
+                  </div>
+                  <div class="flex justify-between text-sm">
+                    <span class="text-stone-500">Content generation</span>
+                    <span class="text-stone-700">{{ estimate.generationCost }} credits</span>
+                  </div>
+                  <div class="flex justify-between text-sm font-medium pt-2 border-t border-stone-100">
+                    <span class="text-stone-700">Total reserved</span>
+                    <span class="text-stone-900">{{ estimate.total }} credits</span>
+                  </div>
+                </div>
+
+                <!-- Balance after -->
+                <div class="mt-3 pt-3 border-t border-stone-100 flex justify-between text-xs">
+                  <span class="text-stone-500">Balance after upload</span>
+                  <span [class.text-red-600]="balanceAfter() < 0" [class.text-stone-600]="balanceAfter() >= 0">
+                    {{ balanceAfter() }} credits
+                  </span>
+                </div>
               </div>
-              <div class="h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-amber-700 rounded-full transition-all duration-150"
-                  [style.width.%]="progress()"
-                ></div>
+
+              <!-- Actions -->
+              <div class="px-4 pb-4">
+                @if (balanceAfter() < 0) {
+                  <p class="text-xs text-red-600 mb-3">
+                    You need {{ estimate.total - (authService.currentUser()?.credits?.balance ?? 0) }} more credits to proceed.
+                    <a routerLink="/credits/history" class="underline font-medium">View credit history</a>
+                  </p>
+                }
+                <div class="flex gap-2">
+                  <button
+                    (click)="confirmUpload()"
+                    [disabled]="balanceAfter() < 0"
+                    class="px-4 py-2 bg-stone-900 text-white rounded-xl text-sm font-medium hover:bg-stone-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Confirm upload
+                  </button>
+                  <button
+                    (click)="cancelUpload()"
+                    class="px-4 py-2 bg-white border border-stone-200 text-stone-700 rounded-xl text-sm font-medium hover:bg-stone-100 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           }
@@ -148,13 +180,13 @@
           <!-- Submit -->
           <button
             (click)="submit()"
-            [disabled]="!canUpload || uploadState() === 'analysing' || uploadState() === 'uploading' || uploadState() === 'warn'"
+            [disabled]="!canSubmit || uploadState() === 'analysing' || uploadState() === 'confirming' || uploadState() === 'submitting'"
             class="w-full py-3 rounded-xl text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-stone-900 text-white hover:bg-stone-800"
           >
             @if (uploadState() === 'analysing') {
               Checking file quality...
-            } @else if (uploadState() === 'uploading') {
-              Uploading...
+            } @else if (uploadState() === 'submitting') {
+              Confirming upload...
             } @else {
               Upload & generate content
             }

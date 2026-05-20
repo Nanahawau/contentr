@@ -7,11 +7,13 @@ import {
 import { getModelToken } from '@nestjs/mongoose';
 import { getFlowProducerToken } from '@nestjs/bullmq';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Types } from 'mongoose';
 import { UploadService } from './upload.service';
 import { Upload } from './schemas/upload.schema';
 import { AwsService } from 'src/integrations/aws/aws.service';
 import { QualityCheckService } from './quality-check.service';
-import { Platform } from './enums/platform.enum';
+import { CreditService } from '../credits/credit.service';
+import { Platform } from 'src/common/enums/platform.enum';
 import { UploadStatus } from './enums/upload-status.enum';
 import { JobName, QueueName } from 'src/common/constants/queue.constants';
 import defaultConfig from '../config/default.config';
@@ -19,9 +21,11 @@ import defaultConfig from '../config/default.config';
 const MOCK_FILE_HASH =
   '73df71fdea120e1e0a800cd9febd75ce944d53183035e8c8bfeaa235bda237e9';
 
+const mockUploadId = new Types.ObjectId().toString();
+
 const mockUpload = {
-  _id: 'upload-id-123',
-  id: 'upload-id-123',
+  _id: mockUploadId,
+  id: mockUploadId,
   user_id: 'user-id-123',
   original_name: 'podcast.mp3',
   s3Key: 'user-id-123/abcdef_podcast.mp3',
@@ -58,16 +62,39 @@ const mockUploadModel = {
   findByIdAndUpdate: jest.fn(),
 };
 
-const mockAwsService = { uploadToS3: jest.fn() };
+const mockAwsService = { uploadToS3: jest.fn(), untagObject: jest.fn() };
 const mockFlowProducer = { add: jest.fn() };
 const mockQualityCheckService = { check: jest.fn() };
 const mockCacheManager = { get: jest.fn(), set: jest.fn(), del: jest.fn() };
+const mockCreditService = {
+  estimateCost: jest.fn(),
+  reserve: jest.fn(),
+  release: jest.fn(),
+  charge: jest.fn(),
+};
 const mockConfig = { maxUploadSizeMb: 100, analysisTokenTtlMs: 900000 };
+
+const mockCreditEstimate = {
+  transcriptionCost: 20,
+  storageCost: 1,
+  generationCost: 13,
+  total: 34,
+};
+
+const mockPlatforms = [Platform.TWITTER, Platform.LINKEDIN];
 
 const validCacheRecord = {
   hash: MOCK_FILE_HASH,
   score: 8,
   userId: 'user-id-123',
+  durationSeconds: 120,
+  wordCount: 0,
+  platforms: mockPlatforms,
+  creditEstimate: mockCreditEstimate,
+  s3Key: 'user-id-123/token123_podcast.mp3',
+  fileSize: 2048,
+  mimetype: 'audio/mpeg',
+  originalname: 'podcast.mp3',
 };
 
 describe('UploadService', () => {
@@ -81,6 +108,7 @@ describe('UploadService', () => {
         { provide: AwsService, useValue: mockAwsService },
         { provide: getFlowProducerToken(), useValue: mockFlowProducer },
         { provide: QualityCheckService, useValue: mockQualityCheckService },
+        { provide: CreditService, useValue: mockCreditService },
         { provide: CACHE_MANAGER, useValue: mockCacheManager },
         { provide: defaultConfig.KEY, useValue: mockConfig },
       ],
@@ -89,6 +117,9 @@ describe('UploadService', () => {
     service = module.get<UploadService>(UploadService);
     jest.clearAllMocks();
     mockUploadModel.find.mockReturnValue(mockQuery);
+    mockCreditService.estimateCost.mockResolvedValue(mockCreditEstimate);
+    mockCreditService.reserve.mockResolvedValue(undefined);
+    mockCreditService.release.mockResolvedValue(undefined);
   });
 
   describe('analyse', () => {
@@ -97,69 +128,91 @@ describe('UploadService', () => {
         score: 2,
         band: 'rejected',
         reason: 'Too short.',
+        durationSeconds: 0,
+        wordCount: 0,
       });
 
-      await expect(service.analyse(mockFile, 'user-id-123')).rejects.toThrow(
-        UnprocessableEntityException,
-      );
+      await expect(
+        service.analyse(mockFile, 'user-id-123', mockPlatforms),
+      ).rejects.toThrow(UnprocessableEntityException);
     });
 
-    it('stores an analysis record in cache and returns the token for a passing file', async () => {
+    it('does not upload to S3 when quality check rejects the file', async () => {
+      mockQualityCheckService.check.mockResolvedValue({
+        score: 2,
+        band: 'rejected',
+        reason: 'Too short.',
+        durationSeconds: 0,
+        wordCount: 0,
+      });
+
+      await service.analyse(mockFile, 'user-id-123', mockPlatforms).catch(() => {});
+
+      expect(mockAwsService.uploadToS3).not.toHaveBeenCalled();
+    });
+
+    it('uploads to S3 with lifecycle=pending tag and caches the record for a passing file', async () => {
       mockQualityCheckService.check.mockResolvedValue({
         score: 8,
         band: 'pass',
         reason: 'Good quality.',
+        durationSeconds: 120,
+        wordCount: 0,
       });
+      mockAwsService.uploadToS3.mockResolvedValue({ success: true });
       mockCacheManager.set.mockResolvedValue(undefined);
 
-      const result = await service.analyse(mockFile, 'user-id-123');
+      const result = await service.analyse(mockFile, 'user-id-123', mockPlatforms);
 
-      expect(result.band).toBe('pass');
+      expect(mockAwsService.uploadToS3).toHaveBeenCalledWith(
+        expect.objectContaining({ tags: { lifecycle: 'pending' } }),
+      );
       expect(result.analysisToken).toBeDefined();
+      expect(result.creditEstimate).toEqual(mockCreditEstimate);
       expect(mockCacheManager.set).toHaveBeenCalledWith(
         expect.stringContaining('analysis:'),
         expect.objectContaining({
           hash: MOCK_FILE_HASH,
           userId: 'user-id-123',
           score: 8,
+          durationSeconds: 120,
+          platforms: mockPlatforms,
+          creditEstimate: mockCreditEstimate,
+          fileSize: mockFile.size,
+          mimetype: mockFile.mimetype,
+          originalname: mockFile.originalname,
         }),
         mockConfig.analysisTokenTtlMs,
       );
     });
 
-    it('stores an analysis record in cache and returns the token for a warn file', async () => {
+    it('uploads to S3 with lifecycle=pending tag for a warn file', async () => {
       mockQualityCheckService.check.mockResolvedValue({
         score: 5,
         band: 'warn',
         reason: 'Low bitrate.',
+        durationSeconds: 45,
+        wordCount: 0,
       });
+      mockAwsService.uploadToS3.mockResolvedValue({ success: true });
       mockCacheManager.set.mockResolvedValue(undefined);
 
-      const result = await service.analyse(mockFile, 'user-id-123');
+      const result = await service.analyse(mockFile, 'user-id-123', mockPlatforms);
 
       expect(result.band).toBe('warn');
-      expect(result.analysisToken).toBeDefined();
+      expect(mockAwsService.uploadToS3).toHaveBeenCalledWith(
+        expect.objectContaining({ tags: { lifecycle: 'pending' } }),
+      );
     });
   });
 
-  describe('create', () => {
-    const dto = {
-      file: mockFile,
-      platforms: [Platform.TWITTER, Platform.LINKEDIN],
-      userId: 'user-id-123',
-      analysisToken: 'valid-token',
-    };
-
-    it('throws BadRequestException when platforms array is empty', async () => {
-      mockCacheManager.get.mockResolvedValue(validCacheRecord);
-      await expect(service.create({ ...dto, platforms: [] })).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
+  describe('confirm', () => {
     it('throws BadRequestException when analysis token is missing from cache', async () => {
       mockCacheManager.get.mockResolvedValue(undefined);
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+
+      await expect(service.confirm('expired-token', 'user-id-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws BadRequestException when token userId does not match the requesting user', async () => {
@@ -167,84 +220,133 @@ describe('UploadService', () => {
         ...validCacheRecord,
         userId: 'different-user',
       });
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
-    });
 
-    it('throws BadRequestException when token hash does not match the uploaded file', async () => {
-      mockCacheManager.get.mockResolvedValue({
-        ...validCacheRecord,
-        hash: 'wrong-hash',
-      });
-      await expect(service.create(dto)).rejects.toThrow(BadRequestException);
+      await expect(service.confirm('valid-token', 'user-id-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('deletes the token from cache after successful verification', async () => {
       mockCacheManager.get.mockResolvedValue(validCacheRecord);
       mockCacheManager.del.mockResolvedValue(undefined);
       mockUploadModel.findOne.mockResolvedValue(null);
-      mockAwsService.uploadToS3.mockResolvedValue(undefined);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
       mockUploadModel.create.mockResolvedValue(mockUpload);
       mockFlowProducer.add.mockResolvedValue(undefined);
 
-      await service.create(dto);
+      await service.confirm('valid-token', 'user-id-123');
 
       expect(mockCacheManager.del).toHaveBeenCalledWith('analysis:valid-token');
     });
 
-    it('uploads to S3 and creates a record when no duplicate hash exists for user', async () => {
-      mockCacheManager.get.mockResolvedValue(validCacheRecord);
-      mockCacheManager.del.mockResolvedValue(undefined);
-      mockUploadModel.findOne.mockResolvedValue(null);
-      mockAwsService.uploadToS3.mockResolvedValue(undefined);
-      mockUploadModel.create.mockResolvedValue(mockUpload);
-      mockFlowProducer.add.mockResolvedValue(undefined);
-
-      const result = await service.create(dto);
-
-      expect(mockAwsService.uploadToS3).toHaveBeenCalledWith(
-        expect.objectContaining({ file: mockFile }),
-      );
-      expect(mockUploadModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          user_id: dto.userId,
-          original_name: mockFile.originalname,
-          mime_type: mockFile.mimetype,
-          file_size: mockFile.size,
-          platforms: dto.platforms,
-          status: UploadStatus.PENDING,
-          quality_score: validCacheRecord.score,
-        }),
-      );
-      expect(result).toEqual({ upload: mockUpload, isDuplicate: false });
-    });
-
-    it('returns the existing upload as a duplicate when status is pending', async () => {
+    it('returns existing upload as duplicate without reserving credits when status is pending', async () => {
       mockCacheManager.get.mockResolvedValue(validCacheRecord);
       mockCacheManager.del.mockResolvedValue(undefined);
       const pendingUpload = { ...mockUpload, status: UploadStatus.PENDING };
       mockUploadModel.findOne.mockResolvedValue(pendingUpload);
 
-      const result = await service.create(dto);
+      const result = await service.confirm('valid-token', 'user-id-123');
 
       expect(result).toEqual({ upload: pendingUpload, isDuplicate: true });
-      expect(mockAwsService.uploadToS3).not.toHaveBeenCalled();
+      expect(mockCreditService.reserve).not.toHaveBeenCalled();
       expect(mockUploadModel.create).not.toHaveBeenCalled();
-      expect(mockFlowProducer.add).not.toHaveBeenCalled();
     });
 
-    it('returns the existing upload as a duplicate when status is completed', async () => {
+    it('returns existing upload as duplicate without reserving credits when status is completed', async () => {
       mockCacheManager.get.mockResolvedValue(validCacheRecord);
       mockCacheManager.del.mockResolvedValue(undefined);
       const completedUpload = { ...mockUpload, status: UploadStatus.COMPLETED };
       mockUploadModel.findOne.mockResolvedValue(completedUpload);
 
-      const result = await service.create(dto);
+      const result = await service.confirm('valid-token', 'user-id-123');
 
       expect(result).toEqual({ upload: completedUpload, isDuplicate: true });
-      expect(mockUploadModel.create).not.toHaveBeenCalled();
+      expect(mockCreditService.reserve).not.toHaveBeenCalled();
     });
 
-    it('creates a new record and reuses the S3 key when the existing upload has failed', async () => {
+    it('untags the S3 object and creates a record when no duplicate exists', async () => {
+      mockCacheManager.get.mockResolvedValue(validCacheRecord);
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockUploadModel.findOne.mockResolvedValue(null);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
+      mockUploadModel.create.mockResolvedValue(mockUpload);
+      mockFlowProducer.add.mockResolvedValue(undefined);
+
+      const result = await service.confirm('valid-token', 'user-id-123');
+
+      expect(mockAwsService.untagObject).toHaveBeenCalledWith(validCacheRecord.s3Key);
+      expect(mockUploadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user_id: 'user-id-123',
+          hash: MOCK_FILE_HASH,
+          s3Key: validCacheRecord.s3Key,
+          original_name: validCacheRecord.originalname,
+          mime_type: validCacheRecord.mimetype,
+          file_size: validCacheRecord.fileSize,
+          platforms: mockPlatforms,
+          status: UploadStatus.PENDING,
+          quality_score: validCacheRecord.score,
+          credits_reserved: mockCreditEstimate.total,
+        }),
+      );
+      expect(result.isDuplicate).toBe(false);
+    });
+
+    it('reserves credits before creating the upload record', async () => {
+      mockCacheManager.get.mockResolvedValue(validCacheRecord);
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockUploadModel.findOne.mockResolvedValue(null);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
+      mockUploadModel.create.mockResolvedValue(mockUpload);
+      mockFlowProducer.add.mockResolvedValue(undefined);
+
+      const reserveOrder: string[] = [];
+      mockCreditService.reserve.mockImplementation(() => {
+        reserveOrder.push('reserve');
+        return Promise.resolve();
+      });
+      mockUploadModel.create.mockImplementation(() => {
+        reserveOrder.push('create');
+        return Promise.resolve(mockUpload);
+      });
+
+      await service.confirm('valid-token', 'user-id-123');
+
+      expect(reserveOrder).toEqual(['reserve', 'create']);
+    });
+
+    it('releases credits and rethrows when S3 untag fails', async () => {
+      mockCacheManager.get.mockResolvedValue(validCacheRecord);
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockUploadModel.findOne.mockResolvedValue(null);
+      mockAwsService.untagObject.mockRejectedValue(new Error('S3 error'));
+
+      await expect(service.confirm('valid-token', 'user-id-123')).rejects.toThrow('S3 error');
+
+      expect(mockCreditService.release).toHaveBeenCalledWith(
+        'user-id-123',
+        expect.any(String),
+        mockCreditEstimate.total,
+      );
+    });
+
+    it('releases credits and rethrows when upload creation fails', async () => {
+      mockCacheManager.get.mockResolvedValue(validCacheRecord);
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockUploadModel.findOne.mockResolvedValue(null);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
+      mockUploadModel.create.mockRejectedValue(new Error('DB error'));
+
+      await expect(service.confirm('valid-token', 'user-id-123')).rejects.toThrow('DB error');
+
+      expect(mockCreditService.release).toHaveBeenCalledWith(
+        'user-id-123',
+        expect.any(String),
+        mockCreditEstimate.total,
+      );
+    });
+
+    it('reuses the existing S3 key and skips untag for a failed duplicate', async () => {
       mockCacheManager.get.mockResolvedValue(validCacheRecord);
       mockCacheManager.del.mockResolvedValue(undefined);
       const failedUpload = { ...mockUpload, status: UploadStatus.FAILED };
@@ -252,12 +354,32 @@ describe('UploadService', () => {
       mockUploadModel.create.mockResolvedValue(mockUpload);
       mockFlowProducer.add.mockResolvedValue(undefined);
 
-      const result = await service.create(dto);
+      const result = await service.confirm('valid-token', 'user-id-123');
 
       expect(result.isDuplicate).toBe(false);
-      expect(mockAwsService.uploadToS3).not.toHaveBeenCalled();
+      expect(mockAwsService.untagObject).not.toHaveBeenCalled();
       expect(mockUploadModel.create).toHaveBeenCalledWith(
         expect.objectContaining({ s3Key: failedUpload.s3Key }),
+      );
+    });
+
+    it('uses platforms from the cache record, not from any external source', async () => {
+      mockCacheManager.get.mockResolvedValue(validCacheRecord);
+      mockCacheManager.del.mockResolvedValue(undefined);
+      mockUploadModel.findOne.mockResolvedValue(null);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
+      mockUploadModel.create.mockResolvedValue(mockUpload);
+      mockFlowProducer.add.mockResolvedValue(undefined);
+
+      await service.confirm('valid-token', 'user-id-123');
+
+      expect(mockUploadModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({ platforms: validCacheRecord.platforms }),
+      );
+      expect(mockFlowProducer.add).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ platforms: validCacheRecord.platforms }),
+        }),
       );
     });
 
@@ -265,11 +387,11 @@ describe('UploadService', () => {
       mockCacheManager.get.mockResolvedValue(validCacheRecord);
       mockCacheManager.del.mockResolvedValue(undefined);
       mockUploadModel.findOne.mockResolvedValue(null);
-      mockAwsService.uploadToS3.mockResolvedValue(undefined);
+      mockAwsService.untagObject.mockResolvedValue(undefined);
       mockUploadModel.create.mockResolvedValue(mockUpload);
       mockFlowProducer.add.mockResolvedValue(undefined);
 
-      await service.create(dto);
+      await service.confirm('valid-token', 'user-id-123');
 
       expect(mockFlowProducer.add).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -279,7 +401,6 @@ describe('UploadService', () => {
             expect.objectContaining({
               name: JobName.TRANSCRIBE,
               queueName: QueueName.TRANSCRIPTION,
-              data: expect.objectContaining({ uploadId: mockUpload.id }),
             }),
           ]),
         }),
@@ -299,9 +420,9 @@ describe('UploadService', () => {
     });
 
     it('returns nextCursor and trims the extra item when results exceed the limit', async () => {
-      const uploads = Array.from({ length: 21 }, (_, i) => ({
+      const uploads = Array.from({ length: 21 }, (_, index) => ({
         ...mockUpload,
-        _id: `id-${i}`,
+        _id: `id-${index}`,
       }));
       mockQuery.limit.mockResolvedValue(uploads);
 

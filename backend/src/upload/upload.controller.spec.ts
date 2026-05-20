@@ -2,9 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
-import { Platform } from './enums/platform.enum';
+import { Platform } from 'src/common/enums/platform.enum';
 import { UploadStatus } from './enums/upload-status.enum';
-import defaultConfig from '../config/default.config';
+import { AnalyseUploadDto } from './dto/analyse-upload.dto';
+import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 
 const mockUpload = {
   _id: 'upload-id-123',
@@ -42,7 +43,7 @@ const mockResponse = { status: jest.fn() };
 
 const mockUploadService = {
   analyse: jest.fn(),
-  create: jest.fn(),
+  confirm: jest.fn(),
   findAll: jest.fn(),
   findOne: jest.fn(),
 };
@@ -55,7 +56,6 @@ describe('UploadController', () => {
       controllers: [UploadController],
       providers: [
         { provide: UploadService, useValue: mockUploadService },
-        { provide: defaultConfig.KEY, useValue: { maxUploadSizeMb: 100 } },
       ],
     }).compile();
 
@@ -64,72 +64,64 @@ describe('UploadController', () => {
   });
 
   describe('analyse', () => {
-    it('delegates to service.analyse with the file and user id', async () => {
+    const analyseDto: AnalyseUploadDto = {
+      platforms: [Platform.TWITTER, Platform.LINKEDIN],
+    };
+
+    it('delegates to service.analyse with the file, user id, and platforms', async () => {
       const analyseResult = {
         score: 8,
         band: 'pass',
         reason: 'Good.',
+        durationSeconds: 120,
+        wordCount: 0,
         analysisToken: 'token-abc',
+        creditEstimate: {
+          transcriptionCost: 20,
+          storageCost: 1,
+          generationCost: 13,
+          total: 34,
+        },
       };
       mockUploadService.analyse.mockResolvedValue(analyseResult);
 
-      const result = await controller.analyse(mockFile, mockUser);
+      const result = await controller.analyse(mockFile, analyseDto, mockUser);
 
       expect(mockUploadService.analyse).toHaveBeenCalledWith(
         mockFile,
         mockUser.id,
+        analyseDto.platforms,
       );
       expect(result).toBe(analyseResult);
     });
-
-    it('throws BadRequestException when file exceeds the size limit', async () => {
-      const oversizedFile = { ...mockFile, size: 200 * 1024 * 1024 };
-      await expect(
-        controller.analyse(oversizedFile, mockUser),
-      ).rejects.toThrow();
-    });
   });
 
-  describe('create', () => {
-    it('returns 201 and the upload when a new file is created', async () => {
-      mockUploadService.create.mockResolvedValue({
+  describe('confirm', () => {
+    const confirmDto: ConfirmUploadDto = { analysisToken: 'valid-token' };
+
+    it('returns 201 and the upload when a new file is confirmed', async () => {
+      mockUploadService.confirm.mockResolvedValue({
         upload: mockUpload,
         isDuplicate: false,
       });
-      const platforms = [Platform.TWITTER, Platform.LINKEDIN];
 
-      const result = await controller.create(
-        mockFile,
-        JSON.stringify(platforms),
-        'valid-token',
-        mockUser,
-        mockResponse as never,
+      const result = await controller.confirm(confirmDto, mockUser, mockResponse as never);
+
+      expect(mockUploadService.confirm).toHaveBeenCalledWith(
+        confirmDto.analysisToken,
+        mockUser.id,
       );
-
-      expect(mockUploadService.create).toHaveBeenCalledWith({
-        file: mockFile,
-        platforms,
-        userId: mockUser.id,
-        analysisToken: 'valid-token',
-      });
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CREATED);
       expect(result).toBe(mockUpload);
     });
 
     it('returns 200 and the existing upload when the file is a duplicate', async () => {
-      mockUploadService.create.mockResolvedValue({
+      mockUploadService.confirm.mockResolvedValue({
         upload: mockUpload,
         isDuplicate: true,
       });
-      const platforms = [Platform.TWITTER, Platform.LINKEDIN];
 
-      const result = await controller.create(
-        mockFile,
-        JSON.stringify(platforms),
-        'valid-token',
-        mockUser,
-        mockResponse as never,
-      );
+      const result = await controller.confirm(confirmDto, mockUser, mockResponse as never);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.OK);
       expect(result).toBe(mockUpload);
